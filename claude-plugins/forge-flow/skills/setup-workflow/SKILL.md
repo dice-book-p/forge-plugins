@@ -27,11 +27,13 @@ description: "forge-flow 워크플로를 프로젝트에 설치합니다."
 3단계: 사용자 선택 (옵션)
 4단계: 설치 실행
   4.1 CLAUDE.md 패치 (루트)
-  4.2 hooks 등록 (루트)
+  4.2 hooks 등록 (루트, 상대 경로)
   4.3 디렉토리 생성 (루트)
   4.4 훅 스크립트 생성 (루트)
-  4.5 조건부 설정
-  4.6 .gitignore 업데이트 (루트)
+  4.5 서브프로젝트 훅 스크립트 복사 (모노레포)
+  4.6 조건부 설정
+  4.7 .gitignore 업데이트 (루트)
+  4.8 훅 스크립트 git 추적 설정
 5단계: 검증 + 결과 보고
 ```
 
@@ -173,62 +175,45 @@ Q5. 기능 브랜치 패턴은? (예: feature/*, feat/*, 없음) [기본: featur
 
 ### 4.2 hooks 등록
 
-**훅은 세션 스코프이며, Claude 시작 시 CWD의 `.claude/settings.local.json`에서 한 번만 로드됩니다.** 훅 스크립트 생성은 루트에만, 훅 등록도 루트에만 수행합니다.
-
-> **⚠️ 절대 경로 필수**: 훅 명령은 **반드시 절대 경로**로 등록합니다. Claude가 세션 중 서브프로젝트로 CWD를 이동하면 상대 경로(`bash .claude/hooks/...`)는 "No such file or directory" 오류를 발생시킵니다.
+**훅은 세션 스코프이며, Claude 시작 시 CWD의 `.claude/settings.local.json`에서 한 번만 로드됩니다.** 훅 명령은 **상대 경로**(`bash .claude/hooks/...`)로 등록하며, Claude가 세션 중 서브프로젝트로 CWD를 이동해도 훅이 동작하도록 **모든 서브프로젝트에도 훅 스크립트를 복사**합니다.
 
 ```
-[단일 레포 / 모노레포 공통]
-  {프로젝트루트}/.claude/settings.local.json  ← hooks 등록 (절대 경로)
-  {프로젝트루트}/.claude/hooks/*.sh           ← 스크립트 생성
+[훅 등록]
+  {프로젝트루트}/.claude/settings.local.json  ← hooks 등록 (루트에만, 상대 경로)
+
+[훅 스크립트 배포]
+  {프로젝트루트}/.claude/hooks/*.sh           ← 원본
+  {서브프로젝트A}/.claude/hooks/*.sh          ← 복사본
+  {서브프로젝트B}/.claude/hooks/*.sh          ← 복사본
 ```
 
-`settings.local.json` 훅 블록 형식 — `{PROJECT_ROOT}`는 프로젝트 루트 **절대 경로**로 치환:
+> **왜 서브프로젝트에도 복사하는가?** 훅 명령은 Claude의 **현재 CWD**에서 실행됩니다. Claude가 서브프로젝트로 이동하면 상대 경로가 서브프로젝트 기준으로 해석되므로, 해당 위치에도 훅 스크립트가 있어야 합니다. 절대 경로는 에이전트팀(worktree) 환경에서 원본 레포를 참조하는 문제가 있어 사용하지 않습니다.
+
+`settings.local.json` 훅 블록 형식 (상대 경로):
 ```json
 {
   "hooks": {
     "UserPromptSubmit": [{
       "matcher": "",
-      "hooks": [{"type": "command", "command": "bash {PROJECT_ROOT}/.claude/hooks/workflow-state.sh"}]
+      "hooks": [{"type": "command", "command": "bash .claude/hooks/workflow-state.sh"}]
     }],
     "Stop": [{
       "matcher": "",
-      "hooks": [{"type": "command", "command": "bash {PROJECT_ROOT}/.claude/hooks/stop-guard.sh"}]
+      "hooks": [{"type": "command", "command": "bash .claude/hooks/stop-guard.sh"}]
     }],
     "PreToolUse": [{
       "matcher": "Bash",
-      "hooks": [{"type": "command", "command": "bash {PROJECT_ROOT}/.claude/hooks/dangerous-cmd-guard.sh"}]
+      "hooks": [{"type": "command", "command": "bash .claude/hooks/dangerous-cmd-guard.sh"}]
     }]
   }
 }
 ```
 
-> 예시: `{PROJECT_ROOT}` → `/Users/user/projects/my-app`
-> `settings.local.json`은 gitignore 대상이므로 절대 경로 사용에 문제 없습니다.
 > `settings.local.json`에 기존 내용이 있으면 `hooks` 블록만 병합합니다. 기존 `permissions`, `enabledMcpjsonServers` 등은 보존.
 
 **에이전트팀 활성화 시 `.claude/settings.json` 추가 등록**:
 
-팀원 worktree에서는 `settings.local.json`이 복사되지 않으므로, git-tracked인 `.claude/settings.json`에도 훅을 등록합니다. worktree에서는 `git rev-parse --show-toplevel`이 worktree 루트를 반환하므로 동적 경로를 사용합니다:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [{
-      "matcher": "",
-      "hooks": [{"type": "command", "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/workflow-state.sh\""}]
-    }],
-    "Stop": [{
-      "matcher": "",
-      "hooks": [{"type": "command", "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/stop-guard.sh\""}]
-    }],
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "hooks": [{"type": "command", "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/dangerous-cmd-guard.sh\""}]
-    }]
-  }
-}
-```
+팀원 worktree에서는 `settings.local.json`이 복사되지 않으므로, git-tracked인 `.claude/settings.json`에도 동일한 hooks 블록을 등록합니다. worktree에는 git-tracked 파일이 복사되므로 훅 스크립트 + settings.json 모두 존재하게 됩니다.
 
 ### 4.3 디렉토리 생성 (루트만)
 
@@ -465,7 +450,24 @@ fi
 exit 0
 ```
 
-### 4.5 조건부 설정
+### 4.5 서브프로젝트 훅 스크립트 복사 (모노레포)
+
+모노레포인 경우, 1단계에서 감지한 **모든 서브프로젝트**에 훅 스크립트를 복사합니다.
+
+```bash
+# 각 서브프로젝트에 훅 스크립트 복사
+for subdir in {서브프로젝트 목록}; do
+  mkdir -p "${subdir}/.claude/hooks/"
+  cp .claude/hooks/*.sh "${subdir}/.claude/hooks/"
+  chmod +x "${subdir}/.claude/hooks/"*.sh
+done
+```
+
+> **settings.local.json은 복사하지 않습니다.** 훅 등록은 루트에만 존재하며, 서브프로젝트에는 **스크립트 파일만** 복사합니다. Claude가 CWD를 이동해도 상대 경로로 스크립트를 찾을 수 있게 하기 위함입니다.
+
+> **단일 레포**: 이 단계를 스킵합니다.
+
+### 4.6 조건부 설정
 
 | 조건 | 설정 |
 |------|------|
@@ -475,7 +477,7 @@ exit 0
 
 > **settings.json 이중 등록**: `settings.local.json`은 gitignore 대상이므로 팀원의 worktree에 복사되지 않습니다. 에이전트팀 활성화 시 `.claude/settings.json`에도 동일한 hooks 블록을 등록하여 팀원이 훅을 로드할 수 있게 합니다. `settings.json`은 git-tracked 파일이므로 worktree에 포함됩니다.
 
-### 4.6 .gitignore 업데이트 (루트만)
+### 4.7 .gitignore 업데이트 (루트만)
 
 ```bash
 # 루트 .gitignore에 추가
@@ -484,7 +486,7 @@ exit 0
 
 > `.forge-flow/` 전체가 gitignore 대상 (설계 문서 + 상태 파일 모두 포함).
 
-### 4.7 훅 스크립트 git 추적 설정
+### 4.8 훅 스크립트 git 추적 설정
 
 `.claude/hooks/*.sh`는 **반드시 git에 추적**되어야 합니다. 에이전트팀(worktree)에서 훅이 동작하려면 git이 관리하는 파일이어야 worktree에 복사됩니다.
 
@@ -511,6 +513,7 @@ git add -f .claude/hooks/*.sh
 | 루트 settings 훅 | `{루트}/.claude/settings.local.json` hooks 키 존재 |
 | design 디렉토리 | `{루트}/.forge-flow/design/` 존재 |
 | .forge-flow 디렉토리 | `{루트}/.forge-flow/` 존재 |
+| [모노레포] 서브프로젝트 훅 | 각 서브프로젝트에 `.claude/hooks/*.sh` 존재 + 실행 권한 |
 | [에이전트팀] 환경변수 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 확인 |
 | [에이전트팀] settings.json | `.claude/settings.json`에 hooks 블록 존재 확인 |
 
@@ -589,13 +592,14 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
    - 기존 프로젝트의 훅 파일 내용은 무시하고, 4.4의 정본으로 전체 교체(덮어쓰기)합니다.
    - **루트에만 적용**
    - 실행 권한 설정 (`chmod +x`)
-2. **hooks 등록 경로 갱신 (절대 경로 마이그레이션)**:
-   - `settings.local.json`의 hooks 명령에서 **상대 경로를 절대 경로로 교체**
-   - `bash .claude/hooks/...` → `bash {PROJECT_ROOT}/.claude/hooks/...`
-   - `{PROJECT_ROOT}`는 현재 프로젝트 루트의 절대 경로 (`pwd` 결과)
-   - 에이전트팀 활성화 시 `.claude/settings.json`도 동일하게 갱신 (동적 경로 사용)
-3. **CLAUDE.md 버전 마커 갱신**: `<!-- forge-flow:version=X.X.X -->` 교체
-4. **CLAUDE.md 템플릿 섹션 갱신** (해당 시):
+2. **hooks 등록 경로 정규화**:
+   - `settings.local.json`의 hooks 명령에서 **절대 경로를 상대 경로로 교체** (기존 절대 경로 마이그레이션)
+   - `bash /absolute/path/.claude/hooks/...` → `bash .claude/hooks/...`
+3. **서브프로젝트 훅 스크립트 동기화** (모노레포):
+   - 루트의 `.claude/hooks/*.sh`를 모든 서브프로젝트에 복사
+   - 기존 서브프로젝트 훅 파일은 덮어쓰기
+4. **CLAUDE.md 버전 마커 갱신**: `<!-- forge-flow:version=X.X.X -->` 교체
+5. **CLAUDE.md 템플릿 섹션 갱신** (해당 시):
    - `<!-- SECTION: 작업 원칙 -->` — 템플릿 기준으로 교체
    - `<!-- SECTION: 워크플로 -->` — 템플릿 기준으로 교체
 
@@ -620,7 +624,8 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 - `<!-- SECTION: 작업 원칙 -->` 섹션
 - `<!-- SECTION: 워크플로 -->` 섹션
 - 루트의 `.claude/hooks/` 3개 훅 스크립트
-- `settings.local.json` hooks 명령 경로 (상대 → 절대 마이그레이션)
+- `settings.local.json` hooks 명령 경로 정규화 (절대 → 상대 마이그레이션)
+- 서브프로젝트 훅 스크립트 동기화 (모노레포)
 
 **update가 절대 건드리지 않는 것**:
 - `<!-- SECTION: 빌드 명령 -->` — 프로젝트 커스텀
