@@ -13,11 +13,11 @@
 - **feat**: 에이전트팀 활성화 시 `.claude/settings.json`에 hooks 이중 등록
   - `settings.local.json`은 gitignore → worktree에 미포함 문제 해결
 - **change**: CLAUDE.md 템플릿 에이전트팀 섹션 구체화 (동적 팀 구성 가이드라인)
-- **fix**: hooks 등록 경로를 **상대 경로 → 절대 경로**로 변경
+- **fix**: hooks 경로 문제 해결 — 서브프로젝트 훅 스크립트 복사 방식으로 전환
   - Claude가 세션 중 서브프로젝트로 CWD 이동 시 "No such file or directory" 오류 해결
-  - `settings.local.json`: `bash {PROJECT_ROOT}/.claude/hooks/...` (절대 경로)
-  - `settings.json` (에이전트팀): `bash "$(git rev-parse --show-toplevel)/.claude/hooks/..."` (동적 경로)
-  - `--update` 시 기존 상대 경로를 절대 경로로 자동 마이그레이션
+  - 상대 경로 유지 + 모노레포 서브프로젝트에 훅 스크립트 복사 (settings.local.json은 루트에만)
+  - 절대 경로는 에이전트팀(worktree) 환경에서 원본 레포 참조 문제가 있어 사용하지 않음
+  - `--update` 시 기존 절대 경로를 상대 경로로 정규화 + 서브프로젝트 훅 동기화
 - **affected**: plan, verify, review-plan SKILL.md, setup-workflow SKILL.md + 훅 스크립트 + 템플릿, 버전 마커
 
 ## v3.1.5
