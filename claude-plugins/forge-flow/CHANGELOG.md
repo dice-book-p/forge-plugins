@@ -1,12 +1,38 @@
 # forge-flow Changelog
 
+## v3.1.6
+
+- **feat**: 에이전트팀 실질 통합 — "제안"에서 **동적 팀 구성 + spawn**으로 전환
+  - plan: 작업 분석 기반 동적 팀 구성 (레이어/모듈/서비스/도메인 분리)
+  - plan: 구현자 + 리뷰어 역할 정의, spawn 프롬프트 템플릿, 상태 파일 확장
+  - verify: 관점별 검증 팀 동적 구성 (AC/패턴/시나리오별 검증자)
+  - verify: 에이전트팀 비활성화 시 기존 서브에이전트 교차검증 유지 (폴백)
+- **feat**: 훅 스크립트에 에이전트팀 팀원 감지 추가
+  - workflow-state.sh: worktree + `.forge-flow/` 부재 시 팀원 컨텍스트 주입
+  - stop-guard.sh: 팀원은 리더가 생명주기 관리하므로 즉시 통과
+- **feat**: 에이전트팀 활성화 시 `.claude/settings.json`에 hooks 이중 등록
+  - `settings.local.json`은 gitignore → worktree에 미포함 문제 해결
+- **change**: CLAUDE.md 템플릿 에이전트팀 섹션 구체화 (동적 팀 구성 가이드라인)
+- **affected**: plan, verify, review-plan SKILL.md, setup-workflow SKILL.md + 훅 스크립트 + 템플릿, 버전 마커
+
+## v3.1.5
+
+- **feat**: state 파일 경로 `.forge-flow/state-*.json` → `.forge-flow/state/state-*.json`으로 분리
+  - `.forge-flow/` 하위를 `design/`과 `state/` 두 디렉토리로 정리
+- **fix**: `--update` 시 Claude가 CHANGELOG 기반으로 훅을 "지능적 수정"하던 문제 해결
+  - CHANGELOG는 사용자 리포트 전용임을 명시
+  - 훅 업데이트는 4.4 섹션 인라인 정본을 그대로 복사하도록 지시 강화
+  - 기존 훅 내용 무시 + 전체 교체(덮어쓰기) 원칙 명시
+- **change**: 서브프로젝트 훅 설치 제거 — 훅은 루트에만 설치 (세션 시작 시 CWD 기준 1회 로드)
+- **affected**: 전 스킬 SKILL.md, setup-workflow SKILL.md + 훅 스크립트 + 템플릿, 버전 마커
+
 ## v3.1.4
 
 - **feat**: `design/` → `.forge-flow/design/`로 통합 — 워크플로 관련 파일을 `.forge-flow/` 한 곳에서 관리
 - **feat**: 작업 완료(커밋) 시 design 파일 + state 파일 자동 정리
 - **feat**: completed 상태 파일은 다음 세션 진입 시 즉시 정리 (+ 연결된 design 파일 포함)
 - **feat**: orphan design 파일 감지 시 알림만 → 자동 삭제로 변경
-- **fix**: setup-workflow 훅 복사 지시 강화 — 원본 파일 Read→Write 복사 필수, 직접 작성 금지 명시
+- **fix**: 훅 스크립트를 SKILL.md에 인라인 포함 — Claude가 경로를 못 찾아 구버전을 작성하는 문제 해결
 - **affected**: clarify, review-req, verify SKILL.md, setup-workflow SKILL.md + 템플릿 + 훅 스크립트
 
 ## v3.1.3
