@@ -173,37 +173,62 @@ Q5. 기능 브랜치 패턴은? (예: feature/*, feat/*, 없음) [기본: featur
 
 ### 4.2 hooks 등록
 
-**훅은 세션 스코프이며, Claude 시작 시 CWD의 `.claude/hooks/`에서 한 번만 로드됩니다.** Claude를 프로젝트 루트에서 실행하면 루트 훅만 로드되므로, 서브프로젝트에 별도 훅을 설치할 필요가 없습니다.
+**훅은 세션 스코프이며, Claude 시작 시 CWD의 `.claude/settings.local.json`에서 한 번만 로드됩니다.** 훅 스크립트 생성은 루트에만, 훅 등록도 루트에만 수행합니다.
 
-따라서 **훅 등록 + 스크립트 생성은 루트에만 수행**합니다:
+> **⚠️ 절대 경로 필수**: 훅 명령은 **반드시 절대 경로**로 등록합니다. Claude가 세션 중 서브프로젝트로 CWD를 이동하면 상대 경로(`bash .claude/hooks/...`)는 "No such file or directory" 오류를 발생시킵니다.
 
 ```
 [단일 레포 / 모노레포 공통]
-  {프로젝트루트}/.claude/settings.local.json  ← hooks 등록
+  {프로젝트루트}/.claude/settings.local.json  ← hooks 등록 (절대 경로)
   {프로젝트루트}/.claude/hooks/*.sh           ← 스크립트 생성
 ```
 
-`settings.local.json` 훅 블록 형식:
+`settings.local.json` 훅 블록 형식 — `{PROJECT_ROOT}`는 프로젝트 루트 **절대 경로**로 치환:
 ```json
 {
   "hooks": {
     "UserPromptSubmit": [{
       "matcher": "",
-      "hooks": [{"type": "command", "command": "bash .claude/hooks/workflow-state.sh"}]
+      "hooks": [{"type": "command", "command": "bash {PROJECT_ROOT}/.claude/hooks/workflow-state.sh"}]
     }],
     "Stop": [{
       "matcher": "",
-      "hooks": [{"type": "command", "command": "bash .claude/hooks/stop-guard.sh"}]
+      "hooks": [{"type": "command", "command": "bash {PROJECT_ROOT}/.claude/hooks/stop-guard.sh"}]
     }],
     "PreToolUse": [{
       "matcher": "Bash",
-      "hooks": [{"type": "command", "command": "bash .claude/hooks/dangerous-cmd-guard.sh"}]
+      "hooks": [{"type": "command", "command": "bash {PROJECT_ROOT}/.claude/hooks/dangerous-cmd-guard.sh"}]
     }]
   }
 }
 ```
 
+> 예시: `{PROJECT_ROOT}` → `/Users/user/projects/my-app`
+> `settings.local.json`은 gitignore 대상이므로 절대 경로 사용에 문제 없습니다.
 > `settings.local.json`에 기존 내용이 있으면 `hooks` 블록만 병합합니다. 기존 `permissions`, `enabledMcpjsonServers` 등은 보존.
+
+**에이전트팀 활성화 시 `.claude/settings.json` 추가 등록**:
+
+팀원 worktree에서는 `settings.local.json`이 복사되지 않으므로, git-tracked인 `.claude/settings.json`에도 훅을 등록합니다. worktree에서는 `git rev-parse --show-toplevel`이 worktree 루트를 반환하므로 동적 경로를 사용합니다:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{
+      "matcher": "",
+      "hooks": [{"type": "command", "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/workflow-state.sh\""}]
+    }],
+    "Stop": [{
+      "matcher": "",
+      "hooks": [{"type": "command", "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/stop-guard.sh\""}]
+    }],
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{"type": "command", "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/dangerous-cmd-guard.sh\""}]
+    }]
+  }
+}
+```
 
 ### 4.3 디렉토리 생성 (루트만)
 
@@ -564,8 +589,13 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
    - 기존 프로젝트의 훅 파일 내용은 무시하고, 4.4의 정본으로 전체 교체(덮어쓰기)합니다.
    - **루트에만 적용**
    - 실행 권한 설정 (`chmod +x`)
-2. **CLAUDE.md 버전 마커 갱신**: `<!-- forge-flow:version=X.X.X -->` 교체
-3. **CLAUDE.md 템플릿 섹션 갱신** (해당 시):
+2. **hooks 등록 경로 갱신 (절대 경로 마이그레이션)**:
+   - `settings.local.json`의 hooks 명령에서 **상대 경로를 절대 경로로 교체**
+   - `bash .claude/hooks/...` → `bash {PROJECT_ROOT}/.claude/hooks/...`
+   - `{PROJECT_ROOT}`는 현재 프로젝트 루트의 절대 경로 (`pwd` 결과)
+   - 에이전트팀 활성화 시 `.claude/settings.json`도 동일하게 갱신 (동적 경로 사용)
+3. **CLAUDE.md 버전 마커 갱신**: `<!-- forge-flow:version=X.X.X -->` 교체
+4. **CLAUDE.md 템플릿 섹션 갱신** (해당 시):
    - `<!-- SECTION: 작업 원칙 -->` — 템플릿 기준으로 교체
    - `<!-- SECTION: 워크플로 -->` — 템플릿 기준으로 교체
 
@@ -590,6 +620,7 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 - `<!-- SECTION: 작업 원칙 -->` 섹션
 - `<!-- SECTION: 워크플로 -->` 섹션
 - 루트의 `.claude/hooks/` 3개 훅 스크립트
+- `settings.local.json` hooks 명령 경로 (상대 → 절대 마이그레이션)
 
 **update가 절대 건드리지 않는 것**:
 - `<!-- SECTION: 빌드 명령 -->` — 프로젝트 커스텀
