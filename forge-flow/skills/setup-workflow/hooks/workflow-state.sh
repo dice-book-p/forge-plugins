@@ -1,6 +1,6 @@
 #!/bin/bash
-# forge-flow v3 UserPromptSubmit Hook
-# 워크플로 진입 보장 + 상태 알림 + orphan 감지
+# forge-flow v3.1.6 UserPromptSubmit Hook
+# 워크플로 진입 보장 + 상태 알림 + orphan 감지 + 에이전트팀 팀원 감지
 #
 # 등록: settings.local.json hooks.UserPromptSubmit
 # stdin: (사용자 프롬프트 정보)
@@ -8,7 +8,14 @@
 
 INPUT=$(cat)
 SESSION_ID="${CLAUDE_SESSION_ID}"
-STATE_FILE=".forge-flow/state-${SESSION_ID}.json"
+STATE_FILE=".forge-flow/state/state-${SESSION_ID}.json"
+
+# 에이전트팀 팀원 감지 (worktree 내부 + .forge-flow/ 부재)
+GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null)
+if [ -n "$GIT_COMMON_DIR" ] && [ "$GIT_COMMON_DIR" != ".git" ] && [ ! -d ".forge-flow" ]; then
+  echo '{"additionalContext": "[TEAM] 팀원 세션. 할당된 태스크에 집중하세요. 담당 범위 외 파일 수정 금지."}'
+  exit 0
+fi
 
 # jq 또는 python3 폴백
 if command -v jq >/dev/null 2>&1; then
@@ -23,8 +30,8 @@ fi
 
 # 0. 상태 파일 정리
 # - completed 상태: 즉시 삭제 (+ 연결된 design 파일도 삭제)
-if ls .forge-flow/state-*.json 1>/dev/null 2>&1; then
-  for sf in .forge-flow/state-*.json; do
+if ls .forge-flow/state/state-*.json 1>/dev/null 2>&1; then
+  for sf in .forge-flow/state/state-*.json; do
     [ -f "$sf" ] || continue
     SF_PHASE=$(_json_read '.phase' "$sf")
     if [ "$SF_PHASE" = "completed" ]; then
@@ -35,7 +42,7 @@ if ls .forge-flow/state-*.json 1>/dev/null 2>&1; then
   done
 fi
 # - 7일 이상 경과: 안전망 삭제
-find .forge-flow/ -name "state-*.json" -mtime +7 -delete 2>/dev/null
+find .forge-flow/state/ -name "state-*.json" -mtime +7 -delete 2>/dev/null
 
 # 1. 기존 세션 — 상태 파일 기반 컨텍스트 주입
 if [ -f "$STATE_FILE" ]; then
@@ -74,7 +81,7 @@ if ls .forge-flow/design/*.md 1>/dev/null 2>&1; then
   for f in .forge-flow/design/*.md; do
     BASENAME=$(basename "$f")
     # 정확한 파일명 매칭 (부분 문자열 오탐 방지)
-    REFERENCED=$(grep -rl "\".forge-flow/design/${BASENAME}\"" .forge-flow/state-*.json 2>/dev/null)
+    REFERENCED=$(grep -rl "\".forge-flow/design/${BASENAME}\"" .forge-flow/state/state-*.json 2>/dev/null)
     if [ -z "$REFERENCED" ]; then
       ORPHANS="$ORPHANS ${BASENAME}"
     fi

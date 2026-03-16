@@ -1,6 +1,6 @@
 #!/bin/bash
-# forge-flow v3 Stop Hook (command 타입)
-# 워크플로 미완료 시 종료 차단 + circuit breaker
+# forge-flow v3.1.6 Stop Hook (command 타입)
+# 워크플로 미완료 시 종료 차단 + circuit breaker + 에이전트팀 팀원 바이패스
 #
 # 등록: settings.local.json hooks.Stop
 # stdin: { "stop_hook_active": bool, "last_assistant_message": "..." }
@@ -8,7 +8,13 @@
 
 INPUT=$(cat)
 SESSION_ID="${CLAUDE_SESSION_ID}"
-STATE_FILE=".forge-flow/state-${SESSION_ID}.json"
+STATE_FILE=".forge-flow/state/state-${SESSION_ID}.json"
+
+# 에이전트팀 팀원은 리더가 생명주기 관리 → 즉시 통과
+GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null)
+if [ -n "$GIT_COMMON_DIR" ] && [ "$GIT_COMMON_DIR" != ".git" ] && [ ! -d ".forge-flow" ]; then
+  exit 0
+fi
 
 # 1. 상태 파일 없으면 → 워크플로 밖, 통과
 if [ ! -f "$STATE_FILE" ]; then

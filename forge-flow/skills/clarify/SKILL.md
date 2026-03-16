@@ -20,7 +20,7 @@ description: "구현 착수 전 요구사항을 명확한 스펙으로 변환합
 
 ## 상태 파일 관리
 
-실행 시작 시 `.forge-flow/state-${CLAUDE_SESSION_ID}.json` 생성:
+실행 시작 시 `.forge-flow/state/state-${CLAUDE_SESSION_ID}.json` 생성:
 
 ```json
 {
