@@ -1,0 +1,14 @@
+{
+  "name": "forge-plugins",
+  "owner": {
+    "name": "dicepark"
+  },
+  "plugins": [
+    {
+      "name": "forge-flow",
+      "source": "./forge-flow",
+      "description": "Claude Code 워크플로 자동화",
+      "version": "3.1.4"
+    }
+  ]
+}
