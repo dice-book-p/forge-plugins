@@ -1,4 +1,4 @@
-<!-- forge-flow:version=3.1.13 -->
+<!-- forge-flow:version=3.1.14 -->
 
 ## forge-flow 플러그인 버저닝 체크리스트
 
@@ -10,8 +10,9 @@ forge-flow 스킬 파일 변경 후 커밋·배포 시 **반드시 아래 항목
 | 2 | **marketplace.json 버전 동기화** | `claude-plugins/.claude-plugin/marketplace.json` | plugin.json과 동일 버전 |
 | 3 | **CHANGELOG.md 항목 추가** | `claude-plugins/forge-flow/CHANGELOG.md` | 최상단에 새 버전 섹션 추가 |
 | 4 | **CLAUDE.md 버전 마커 갱신** | 루트 `CLAUDE.md` 1행 | `<!-- forge-flow:version=X.Y.Z -->` |
-| 5 | **커밋** | — | 위 4개 파일 + 변경된 SKILL.md 모두 포함 |
-| 6 | **마켓플레이스 배포** | — | `git subtree push --prefix=claude-plugins forge-plugins main` |
+| 5 | **requires_update 갱신 (조건부)** | `plugin.json` + `clarify/SKILL.md` | 훅/CLAUDE.md 섹션 변경 시에만 갱신 |
+| 6 | **커밋** | — | 위 파일 + 변경된 SKILL.md 모두 포함 |
+| 7 | **마켓플레이스 배포** | — | `git subtree push --prefix=claude-plugins forge-plugins main` |
 
 ### CHANGELOG 작성 규칙
 
