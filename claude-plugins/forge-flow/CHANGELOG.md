@@ -1,5 +1,39 @@
 # forge-flow Changelog
 
+## v3.1.9
+
+- **feat**: `AskUserQuestion` 패턴 도입 — 사용자 피드백을 구조화된 선택지 UI로 수집
+  - clarify: 요구사항 재진술 확인, 핵심 질문 (선택지 있는 경우), 스펙 확정 동의
+  - review-req: PASS 후 사용자 확인 게이트 (승인/수정/재검토)
+  - plan: 에이전트팀 구성 승인 (승인/단일세션/구성수정)
+  - verify/test/review-req/review-plan: CONCERNS 판정 시 사용자 판단 위임
+- **affected**: clarify, review-req, plan, review-plan, verify, test SKILL.md, 버전 마커
+
+## v3.1.8
+
+- **feat**: 검증자(Verifier)와 테스터(Tester) 역할 분리
+  - `verify`: 코드 수준 검증에 집중 (AC 대조, 패턴 일관성, 사이드이펙트)
+  - `test`: 실행 테스트 신규 스킬 — 브라우저 자동화(UI/UX) + API 테스트
+  - 테스터는 `model: "sonnet"` 고정 (리더가 opus여도 테스터는 sonnet)
+  - verify PASS 후 자동으로 test 호출 (S 규모 + UI AC 없으면 스킵)
+- **change**: verify에서 "검증자-테스트" 역할 제거 → test 스킬로 이관
+- **change**: 워크플로 테이블에 test 단계 추가 (verify → test → 커밋)
+- **change**: 모델 사용 전략에 테스터 sonnet 고정 추가
+- **affected**: verify SKILL.md, test SKILL.md (신규), CLAUDE.md 템플릿, plugin.json, 버전 마커
+
+## v3.1.7
+
+- **feat**: 사용자 확인 게이트 추가 — review-req PASS 후 사용자 승인을 받아야 plan 진행
+  - 요구사항 확정까지 사용자가 반드시 피드백하여 의도와 다른 방향 방지
+  - review-req 결과 요약 + "진행할까요?" 형식으로 보고
+- **feat**: 에이전트팀 모델 사용 전략 도입
+  - 분석/검증/플랜 (review-req 서브에이전트, verify 검증팀): 세션 모델 상속 (model 파라미터 생략)
+  - 구현/리뷰 (plan 구현자, 리뷰어): `model: "sonnet"` 고정
+  - opus 세션에서는 검증은 opus, 구현은 sonnet → 비용 절감 + 품질 유지
+- **change**: CLAUDE.md 템플릿 워크플로 테이블에 사용자 확인 단계 추가
+- **change**: CLAUDE.md 템플릿 에이전트팀 섹션에 모델 사용 전략 추가
+- **affected**: review-req, plan, verify SKILL.md, CLAUDE.md 템플릿, 버전 마커
+
 ## v3.1.6
 
 - **feat**: 에이전트팀 실질 통합 — "제안"에서 **동적 팀 구성 + spawn**으로 전환

@@ -3,7 +3,7 @@ name: setup-workflow
 description: "forge-flow 워크플로를 프로젝트에 설치합니다."
 ---
 
-# /forge-flow:setup-workflow  `v3.1.6`
+# /forge-flow:setup-workflow  `v3.1.7`
 
 프로젝트에 forge-flow 워크플로를 설치합니다.
 단일 레포, 모노레포 모두 자동 감지하여 올바르게 설치합니다.
@@ -519,7 +519,7 @@ git add -f .claude/hooks/*.sh
 
 결과 보고 형식:
 ```
-forge-flow v3.1.6 설치 완료
+forge-flow v3.1.7 설치 완료
 
 [루트 설치 항목]
   ✅ CLAUDE.md      — 워크플로 섹션 + 브랜치 전략 + 빌드 명령
