@@ -291,19 +291,19 @@ if [ -f "$STATE_FILE" ]; then
 
   case "$PHASE" in
     clarifying)
-      echo "{\"additionalContext\": \"[WORKFLOW] 요구사항 명확화 중. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 요구사항 명확화 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 사용자와의 대화 맥락이 아직 design 문서에 확정되지 않았습니다.\"}" ;;
     reviewing-req)
-      echo "{\"additionalContext\": \"[WORKFLOW] 요구사항 검수 중. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 요구사항 검수 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
     planning)
-      echo "{\"additionalContext\": \"[WORKFLOW] 설계 중. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 설계 중. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 plan 완료 후 /compact를 권장합니다.\"}" ;;
     reviewing-plan)
-      echo "{\"additionalContext\": \"[WORKFLOW] 설계 검수 중. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 설계 검수 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
     implementing)
-      echo "{\"additionalContext\": \"[WORKFLOW] 구현 중 (규모: $SCALE). 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 구현 중 (규모: $SCALE). 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 시작 전이라면 /compact 권장. 구현 중간에는 피하세요.\"}" ;;
     verifying)
-      echo "{\"additionalContext\": \"[WORKFLOW] 검수 진행 중. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 검수 진행 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 결과 맥락이 손실될 수 있습니다.\"}" ;;
     verified)
-      echo "{\"additionalContext\": \"[WORKFLOW] 검수 완료. 커밋 가능. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 검수 완료. 커밋 가능. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 커밋해도 안전합니다.\"}" ;;
     completed)
       echo "{\"additionalContext\": \"[WORKFLOW] 작업 완료.\"}" ;;
     *)
