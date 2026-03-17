@@ -1,5 +1,14 @@
 # forge-flow Changelog
 
+## v3.1.15
+
+- **feat**: plan/verify에 기존 코드 패턴 일관성 규칙 추가
+  - plan 1단계: 기존 코드 패턴 파악 스텝 신설 (네이밍, 에러 처리, 파일 구조 등)
+  - plan 3단계: 구현 계획에 `따를 기존 패턴` 테이블 추가 — 항목별 패턴 + 근거 파일 기록
+  - verify: 코드 리뷰에서 `따를 기존 패턴` 기준 대조, 위반 시 REWORK 판정
+  - 원칙: 별도 요청 없으면 기존 패턴 유지, 패턴 변경은 사용자 승인 필요
+- **affected**: plan SKILL.md, verify SKILL.md, 버전 마커
+
 ## v3.1.14
 
 - **feat**: clarify에 프로젝트 업데이트 알림 기능 추가
