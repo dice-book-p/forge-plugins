@@ -1,5 +1,13 @@
 # forge-flow Changelog
 
+## v3.1.14
+
+- **feat**: clarify에 프로젝트 업데이트 알림 기능 추가
+  - plugin.json에 `requires_update` 필드 신설 — 훅/CLAUDE.md 섹션 변경 시에만 갱신
+  - clarify 실행 시 CLAUDE.md 버전 마커 < `requires_update`이면 `--update` 안내 표시 (차단 없이 정상 진행)
+  - 스킬만 변경된 배포에서는 알림 없음 (자동 반영)
+- **affected**: clarify SKILL.md, plugin.json, 버전 마커
+
 ## v3.1.13
 
 - **change**: test 스킬 섹션 구조 재배치 — 에이전트팀을 기본, 서브에이전트를 폴백으로 전환

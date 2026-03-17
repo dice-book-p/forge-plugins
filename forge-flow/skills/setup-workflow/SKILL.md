@@ -546,9 +546,11 @@ forge-flow v3.1.7 설치 완료
 
 ### 1단계: 버전 비교
 
-CLAUDE.md의 `<!-- forge-flow:version=X.X.X -->` 마커와 플러그인 버전 비교:
-- 동일하면 → "이미 최신 버전입니다 (vX.X.X)" 출력 후 종료
-- 다르면 → 2단계로 진행
+CLAUDE.md의 `<!-- forge-flow:version=X.X.X -->` 마커와 plugin.json의 `requires_update` 비교:
+- 마커 ≥ `requires_update` → "프로젝트 설정이 최신입니다 (vX.X.X)" 출력 후 종료
+- 마커 < `requires_update` → 2단계로 진행
+
+> `requires_update`는 훅/CLAUDE.md 섹션이 변경된 버전을 가리킵니다. 스킬만 변경된 배포에서는 이 값이 올라가지 않으므로 --update가 불필요합니다.
 
 ### 2단계: 변경 사항 분석 + 리포트
 
@@ -598,7 +600,7 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 3. **서브프로젝트 훅 스크립트 동기화** (모노레포):
    - 루트의 `.claude/hooks/*.sh`를 모든 서브프로젝트에 복사
    - 기존 서브프로젝트 훅 파일은 덮어쓰기
-4. **CLAUDE.md 버전 마커 갱신**: `<!-- forge-flow:version=X.X.X -->` 교체
+4. **CLAUDE.md 버전 마커 갱신**: `<!-- forge-flow:version=X.X.X -->`를 plugin.json의 `requires_update` 값으로 교체
 5. **CLAUDE.md 템플릿 섹션 갱신** (해당 시):
    - `<!-- SECTION: 작업 원칙 -->` — 템플릿 기준으로 교체
    - `<!-- SECTION: 워크플로 -->` — 템플릿 기준으로 교체
