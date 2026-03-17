@@ -168,8 +168,8 @@ PASS / FAIL + 근거
 ## 결과 종합
 
 **단일 테스터**:
-- PASS → 작업 완료
-- FAIL → 실패 항목 정리 → 수정 후 재테스트
+- 통과 → 작업 완료
+- 실패 → 실패 항목 정리 → 수정 후 재테스트
 
 **테스트 팀** (리더가 종합):
 1. 모든 테스터의 결과 수집
@@ -181,17 +181,17 @@ PASS / FAIL + 근거
 
 | 등급 | 기준 | 조치 |
 |------|------|------|
-| **PASS** | 전 테스트 항목 통과 | 작업 완료 |
-| **CONCERNS** | 경미한 UI 이슈 (스타일 미세 차이 등) | `AskUserQuestion`으로 판단 위임 |
-| **REWORK** | AC 미충족 (기능 미동작, API 에러 등) | 해당 부분 수정 → 재테스트 |
-| **FAIL** | 근본적 문제 (페이지 미로딩, 서버 에러 등) | 이전 단계부터 재검토 |
+| **통과**(PASS) | 전 테스트 항목 통과 | 작업 완료 |
+| **주의**(CONCERNS) | 경미한 UI 이슈 (스타일 미세 차이 등) | `AskUserQuestion`으로 판단 위임 |
+| **재작업**(REWORK) | AC 미충족 (기능 미동작, API 에러 등) | 해당 부분 수정 → 재테스트 |
+| **실패**(FAIL) | 근본적 문제 (페이지 미로딩, 서버 에러 등) | 이전 단계부터 재검토 |
 
-> **REWORK 연속 3회 시 FAIL로 에스컬레이션.**
+> **재작업 연속 3회 시 실패로 에스컬레이션.**
 
-**CONCERNS 판정 시 AskUserQuestion 호출**:
+**주의 판정 시 AskUserQuestion 호출**:
 ```
 question: "경미한 UI 이슈가 발견되었습니다. 어떻게 진행할까요?"
-header: "CONCERNS"
+header: "주의"
 options:
   - label: "수용 — 진행 (Recommended)"
     description: "경미한 이슈를 인지하고 다음 단계로 진행합니다"
@@ -200,9 +200,9 @@ options:
 multiSelect: false
 ```
 
-**REWORK 처리 흐름**:
+**재작업 처리 흐름**:
 1. 실패한 테스트 항목과 근거(스크린샷/로그)를 사용자에게 보고
-2. 상태 파일의 `rework_count`를 +1 (`rework_count` ≥ 3이면 FAIL로 에스컬레이션)
+2. 상태 파일의 `rework_count`를 +1 (`rework_count` ≥ 3이면 실패로 에스컬레이션)
 3. phase를 `"implementing"`으로 되돌림
 4. 수정 완료 후 `/forge-flow:verify` → `/forge-flow:test` 재실행
 

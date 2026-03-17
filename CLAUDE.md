@@ -58,19 +58,19 @@ forge-flow 스킬 파일 변경 후 커밋·배포 시 **반드시 아래 항목
 |---|------|--------|------|
 | 1 | `/forge-flow:clarify` | 작업 요청 즉시 | S/M/L |
 | 2 | `/forge-flow:review-req` | clarify 완료 후 | S/M/L |
-| 2.5 | **사용자 확인** | review-req PASS 후 | S/M/L |
+| 2.5 | **사용자 확인** | review-req 통과 후 | S/M/L |
 | 3 | `/forge-flow:plan` | 사용자 승인 후 | S/M/L |
 | 4 | `/forge-flow:review-plan` | plan 완료 후 (조건부) | L 필수, M 조건부 |
-| 5 | 구현 | plan/review-plan PASS 후 | S/M/L |
+| 5 | 구현 | plan/review-plan 통과 후 | S/M/L |
 | 6 | `/forge-flow:verify` | 구현 완료 즉시 | S/M/L |
-| 7 | `/forge-flow:test` | verify PASS 후 | M/L (S 조건부) |
-| 8 | 커밋 | test PASS/스킵 후 | S/M/L |
+| 7 | `/forge-flow:test` | verify 통과 후 | M/L (S 조건부) |
+| 8 | 커밋 | test 통과/스킵 후 | S/M/L |
 
 **규칙**:
 - `/forge-flow:clarify` 없이 구현 착수 금지
 - `/forge-flow:verify` + `/forge-flow:test` 합격 없이 작업 완료 선언 금지
 - `.forge-flow/design/` 문서의 AC 항목을 모두 충족해야 작업 완료
-- review-req PASS 후 **사용자 확인** → plan → implement → verify까지 자동 진행 (위험 작업 제외)
+- review-req 통과 후 **사용자 확인** → plan → implement → verify까지 자동 진행 (위험 작업 제외)
 
 **상태 파일**: `.forge-flow/state/state-${CLAUDE_SESSION_ID}.json` — 현재 워크플로 단계 추적
 
