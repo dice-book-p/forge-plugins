@@ -1,5 +1,13 @@
 # forge-flow Changelog
 
+## v3.1.11
+
+- **fix**: 에이전트팀/서브에이전트 spawn 지시 명확화 — 3개 스킬 일괄 수정
+  - 에이전트팀 섹션: "에이전트팀 기능으로 구성 (Agent tool 서브에이전트가 아님)" 명시
+  - 서브에이전트 폴백 섹션: "Agent tool로 서브에이전트 spawn" 명시 + "(폴백)" 라벨 추가
+  - 에이전트팀 활성화 시 Agent tool 서브에이전트로 실행되던 문제 해결
+- **affected**: test SKILL.md, verify SKILL.md, review-req SKILL.md, plugin.json, marketplace.json, 버전 마커
+
 ## v3.1.10
 
 - **feat**: test 스킬 에이전트팀 전환 — 복수 테스터를 에이전트팀 패턴으로 전환
