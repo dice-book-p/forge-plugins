@@ -6,7 +6,12 @@
   - 에이전트팀 섹션: "에이전트팀 기능으로 구성 (Agent tool 서브에이전트가 아님)" 명시
   - 서브에이전트 폴백 섹션: "Agent tool로 서브에이전트 spawn" 명시 + "(폴백)" 라벨 추가
   - 에이전트팀 활성화 시 Agent tool 서브에이전트로 실행되던 문제 해결
-- **affected**: test SKILL.md, verify SKILL.md, review-req SKILL.md, plugin.json, marketplace.json, 버전 마커
+- **feat**: 판정 상태 한글화 — 사용자 표시는 한글, 내부 관리는 영문 유지
+  - 품질 게이트: 통과(PASS) / 주의(CONCERNS) / 재작업(REWORK) / 실패(FAIL)
+  - AskUserQuestion header, 결과 보고, 에스컬레이션 안내: 한글
+  - 에이전트 프롬프트 응답 형식, 상태 파일, design 기록: 영문 유지
+  - CLAUDE.md 템플릿 워크플로 테이블: 한글 동기화
+- **affected**: test, verify, review-req, review-plan SKILL.md, CLAUDE.md 템플릿, 버전 마커
 
 ## v3.1.10
 
