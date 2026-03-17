@@ -1,5 +1,20 @@
 # forge-flow Changelog
 
+## v3.1.10
+
+- **feat**: test 스킬 에이전트팀 전환 — 복수 테스터를 에이전트팀 패턴으로 전환
+  - 팀 활성화 조건: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` + 테스트 도메인 2개 이상
+  - 비활성화 시 단일 테스터(기본) 폴백 유지
+  - 테스트 팀 구성 보고 + 상태 파일 `agent_team` 확장
+  - 실패한 테스터만 재실행 가능 (전체 재실행 불필요)
+  - 모델: `sonnet` 고정 유지
+- **feat**: review-req 스킬 에이전트팀 지원 추가 (L규모 조건부)
+  - L규모 + 팀 활성화 시: 검증자-완전성/실현성/일관성 동적 구성
+  - S/M 규모 또는 팀 비활성화 시: 기존 서브에이전트 교차검증 유지
+  - 상태 파일 `agent_team` 확장
+  - 모델: 세션 모델 상속 유지
+- **affected**: test SKILL.md, review-req SKILL.md, plugin.json, marketplace.json, 버전 마커
+
 ## v3.1.9
 
 - **feat**: `AskUserQuestion` 패턴 도입 — 사용자 피드백을 구조화된 선택지 UI로 수집
