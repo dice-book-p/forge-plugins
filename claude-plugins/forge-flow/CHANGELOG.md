@@ -1,5 +1,13 @@
 # forge-flow Changelog
 
+## v3.1.12
+
+- **feat**: workflow-state 훅에 `/compact` 안내 추가
+  - 안전한 시점 (implementing 진입, verified): compact 권장 안내
+  - 피해야 할 시점 (clarifying, reviewing-req, reviewing-plan, verifying): compact 주의 안내
+  - planning: plan 완료 후 compact 권장 안내
+- **affected**: setup-workflow SKILL.md (workflow-state.sh 훅 스크립트), 버전 마커
+
 ## v3.1.11
 
 - **fix**: 에이전트팀/서브에이전트 spawn 지시 명확화 — 3개 스킬 일괄 수정
