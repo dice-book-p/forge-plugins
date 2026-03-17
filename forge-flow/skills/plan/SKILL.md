@@ -179,8 +179,20 @@ L → review-plan 실행 (필수)
 
 공유 인터페이스:
   - {구현자 A ↔ B 간 경계: API 시그니처, 공유 타입 등}
+```
 
-팀을 구성할까요? [Y/n]
+**AskUserQuestion 호출**:
+```
+question: "에이전트팀을 구성할까요?"
+header: "팀 구성"
+options:
+  - label: "승인 — 팀 구성 (Recommended)"
+    description: "위 구성대로 팀을 spawn하고 병렬 구현을 시작합니다"
+  - label: "단일 세션 구현"
+    description: "팀 없이 리더가 직접 순차 구현합니다"
+  - label: "구성 수정"
+    description: "팀원 구성이나 범위를 조정합니다"
+multiSelect: false
 ```
 
 #### 팀원 spawn 절차
@@ -191,7 +203,7 @@ L → review-plan 실행 (필수)
 2. **태스크 생성**: 각 구현자 + 리뷰어의 태스크를 TaskCreate로 생성
 3. **팀원 spawn**: 각 역할별로 팀원을 spawn하되, 아래 프롬프트 템플릿에 따라 컨텍스트 전달
 
-**구현자 프롬프트 템플릿**:
+**구현자 프롬프트 템플릿** (`model: "sonnet"`):
 ```
 당신은 {프로젝트명}의 {담당 범위} 구현자입니다.
 
@@ -214,7 +226,7 @@ L → review-plan 실행 (필수)
 4. 담당 범위 외 파일 수정 금지
 ```
 
-**리뷰어 프롬프트 템플릿**:
+**리뷰어 프롬프트 템플릿** (`model: "sonnet"`):
 ```
 당신은 {프로젝트명}의 코드 리뷰어입니다.
 

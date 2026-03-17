@@ -48,16 +48,29 @@ description: "구현 착수 전 요구사항을 명확한 스펙으로 변환합
 
 ### 2단계: 요구사항 재진술
 
-받은 요구사항을 내가 이해한 대로 다시 서술합니다.
+받은 요구사항을 내가 이해한 대로 다시 서술한 뒤, `AskUserQuestion`으로 확인합니다.
 
 ```
 [내가 이해한 요구사항]
 <원본 요구사항을 자신의 언어로 1~3문장으로 재서술>
-
-혹시 이 이해가 맞나요? 아니라면 어떤 부분이 다른지 알려주세요.
 ```
 
-틀렸다면 → 수정된 내용으로 다시 재진술 → 동의 확인 후 3단계 진행.
+**AskUserQuestion 호출**:
+```
+question: "위 이해가 맞나요?"
+header: "요구사항"
+options:
+  - label: "맞습니다"
+    description: "이 이해로 진행합니다"
+  - label: "부분 수정"
+    description: "대체로 맞지만 일부 수정이 필요합니다"
+  - label: "다시 설명"
+    description: "이해가 많이 다릅니다. 다시 설명하겠습니다"
+multiSelect: false
+```
+
+- "맞습니다" → 3단계 진행
+- "부분 수정" / "다시 설명" / Other → 수정된 내용으로 다시 재진술 → 재확인
 
 ### 3단계: 핵심 질문 (최대 5개)
 
@@ -70,6 +83,34 @@ description: "구현 착수 전 요구사항을 명확한 스펙으로 변환합
 | 해석 분기 | "A 방식과 B 방식 중 어느 쪽인가요?" |
 | 예외/엣지케이스 | "기존 데이터는 어떻게 처리하나요?" |
 | 우선순위 | "먼저 해야 할 부분이 있나요?" |
+
+**AskUserQuestion 활용**: 선택지가 명확한 질문은 `AskUserQuestion`으로 구조화합니다.
+- 1회 호출에 최대 4개 질문까지 묶을 수 있음
+- 선택지가 있는 질문 → `AskUserQuestion` (예: 해석 분기, 우선순위)
+- 자유 서술이 필요한 질문 → 텍스트로 질문
+
+```
+# 예시: 해석 분기 + 우선순위를 한 번에 질문
+questions:
+  - question: "인증 방식을 어떻게 구현할까요?"
+    header: "인증 방식"
+    options:
+      - label: "JWT 토큰"
+        description: "Stateless, 확장성 우수"
+      - label: "세션 기반"
+        description: "서버 측 상태 관리, 기존 패턴"
+    multiSelect: false
+  - question: "먼저 구현할 부분이 있나요?"
+    header: "우선순위"
+    options:
+      - label: "백엔드 먼저"
+        description: "API 완성 후 프론트엔드"
+      - label: "프론트엔드 먼저"
+        description: "UI 완성 후 API 연동"
+      - label: "동시 진행"
+        description: "BE/FE 병렬 작업"
+    multiSelect: false
+```
 
 ### 4단계: 예비 규모 판정
 
@@ -96,11 +137,25 @@ description: "구현 착수 전 요구사항을 명확한 스펙으로 변환합
 제외 범위: <이번 작업에서 하지 않는 것>
 주의사항: <알려진 제약이나 위험>
 예비 규모: M (또는 L — 근거 명시)
-
-이 스펙으로 진행할까요?
 ```
 
-동의 받으면 → `.forge-flow/design/{작업명}.md` 파일 생성.
+**AskUserQuestion 호출**:
+```
+question: "이 스펙으로 진행할까요?"
+header: "스펙 확정"
+options:
+  - label: "승인 (Recommended)"
+    description: "이 스펙으로 design 문서를 생성하고 진행합니다"
+  - label: "수정 필요"
+    description: "일부 항목을 수정한 뒤 다시 확인합니다"
+  - label: "처음부터 다시"
+    description: "요구사항을 다시 정리합니다"
+multiSelect: false
+```
+
+- "승인" → `.forge-flow/design/{작업명}.md` 파일 생성
+- "수정 필요" / Other → 수정 후 재확인
+- "처음부터 다시" → 1단계부터 재실행
 
 > **동일 파일명 충돌 방지**: `.forge-flow/design/{작업명}.md`가 이미 존재하고 다른 세션이 참조 중이면 `{작업명}-2.md` 등으로 자동 넘버링.
 
