@@ -1,5 +1,13 @@
 # forge-flow Changelog
 
+## v3.3.2
+
+- **fix**: 에이전트팀 spawn 방식을 기술적으로 명확히 구분
+  - 에이전트팀: "Agent tool 사용 금지" 명시, 자연어로 독립 프로세스 spawn
+  - 서브에이전트 폴백: "Agent tool 사용" 명시, CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 미설정 시에만
+  - verify, review-req, test, plan 4개 스킬 모두 동일 패턴 적용
+- **affected**: verify, review-req, test, plan SKILL.md
+
 ## v3.3.1
 
 - **fix**: 에이전트팀 vs 서브에이전트 결정 로직 명확화

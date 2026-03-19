@@ -85,7 +85,8 @@ design 문서의 `## 검증 강도` 섹션을 확인합니다. 검증 강도는 
 
 **A. 에이전트팀 교차검수 (기본)**
 
-> **에이전트팀 기능**으로 검증 팀을 구성합니다. Agent tool 서브에이전트가 아닌, 에이전트팀의 독립 프로세스로 각 검증자를 spawn합니다.
+> **에이전트팀으로 검증 팀을 생성합니다.** 각 검증자는 독립 Claude Code 프로세스로 실행됩니다.
+> **Agent tool(서브에이전트)을 사용하지 않습니다.** 에이전트팀은 Agent tool이 아닌, 자연어로 팀원을 spawn하는 별도 시스템입니다.
 
 검증 관점을 분석하여 팀원을 동적으로 구성합니다:
 
@@ -170,11 +171,11 @@ PASS / CONCERNS / REWORK / FAIL + 근거
 
 ---
 
-**B. 에이전트팀 비활성화 시에만: 서브에이전트 교차검수 (폴백)**
+**B. 서브에이전트 교차검수 (폴백 — `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` 미설정 시에만)**
 
 > 이 섹션은 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`가 **미설정**인 경우에만 적용됩니다. 설정되어 있으면 반드시 위 A(에이전트팀)를 사용하세요.
 
-서브에이전트로 검수자를 spawn합니다 (Agent tool, `isolation: "worktree"`, model 생략 → 세션 모델 상속):
+**Agent tool**을 사용하여 서브에이전트로 검수자를 spawn합니다 (`isolation: "worktree"`, model 생략 → 세션 모델 상속):
 
 ```
 당신은 독립 검수자입니다. 아래 design 문서와 코드 변경(diff)을 검토하고, 각 항목에 PASS/FAIL + 근거를 반환하세요.
