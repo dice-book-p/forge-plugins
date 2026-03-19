@@ -110,7 +110,15 @@ multiSelect: false
 {작업 중 발견된 gotcha나 주의점}
 ```
 
-### 4단계: 정리 + 완료 보고
+### 4단계: Rework 교훈 기록 (조건부)
+
+design 문서의 `## 검수 이력`에 REWORK 이력이 있는 경우에만 실행합니다. REWORK이 없었으면 이 단계를 스킵합니다.
+
+REWORK 이력에서 교훈을 추출하여 `.forge-flow/rework-log.md`에 기록합니다 (verify SKILL.md의 "Rework Log 관리" 규칙에 따름).
+
+> verify/test REWORK 시점에 이미 기록된 항목이면 중복 기록하지 않습니다.
+
+### 5단계: 정리 + 완료 보고
 
 1. 상태 파일 삭제: `rm -f .forge-flow/state/state-${CLAUDE_SESSION_ID}.json`
 2. 완료 보고:

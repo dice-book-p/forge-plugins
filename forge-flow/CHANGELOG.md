@@ -1,5 +1,23 @@
 # forge-flow Changelog
 
+## v3.2.3
+
+- **feat**: 검증 결과 숙의(Deliberation) 단계 강화
+  - 팀원 결과 수집 후 불일치 식별 → 갈등 분석 → 판정 근거 작성 프로세스 추가
+  - verify: 메인 세션 vs 검증자 간 불일치 항목에 대한 추론 + 코드 증거 기반 판정
+  - review-req: 검증 관점(완전성/실현성/일관성) 간 갈등 분석 + 근거 명시
+  - test: 테스터 간 결과 불일치 시 환경 차이 vs 실제 결함 판별
+  - 숙의 결과 보고 형식 표준화 (일치/불일치/판정 근거)
+- **feat**: Rework Log — REWORK 패턴 학습 + 재발 방지
+  - verify/test REWORK 시 `.forge-flow/rework-log.md`에 패턴 기록
+  - 중복 병합(×N 카운트) + 단발성 30일 TTL + 최대 10건 유지
+  - clarify/plan에서 rework-log 참조하여 과거 실수 예방
+  - complete에서 REWORK 이력 있으면 교훈 기록 (중복 방지)
+- **feat**: L규모 자가 체크포인트
+  - 구현 50% 시점에서 패턴 준수 + AC 충족 자가 점검
+  - design 문서의 구현 계획에 체크리스트 포함 (L규모만)
+- **affected**: verify, review-req, test, clarify, plan, complete SKILL.md
+
 ## v3.2.2
 
 - **fix**: `installed_plugins.json` version 2 형식 대응
