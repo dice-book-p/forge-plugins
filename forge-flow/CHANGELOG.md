@@ -1,5 +1,27 @@
 # forge-flow Changelog
 
+## v3.2.0
+
+- **feat**: `/forge-flow:complete` 신규 스킬 — 작업 마무리 단계 추가
+  - 커밋 여부 확인 (AskUserQuestion: 커밋 진행/메시지 수정/변경 확인/스킵)
+  - design 문서 처리 선택 (삭제/요약 보존 via knowledge-hub/archive 보관)
+  - 상태 파일 자동 정리
+  - test PASS 후 자동 트리거
+- **feat**: 검증 강도(0~N) 사용자 선택 — plan 단계에서 교차검증 수준 설정
+  - 경량(0): 교차검증 스킵, 표준(1): 서브에이전트 1개, 강화(2+): 검증팀 구성
+  - 규모별 기본 추천 (S=0, M=1, L=2) + 사용자 오버라이드
+  - design 문서에 `검증 강도` 섹션 추가
+  - verify, test 단계에서 검증 강도 참조
+- **feat**: review-req S규모 교차검증 스킵 — S규모는 메인 세션 검수만 수행
+- **feat**: 코드 패턴 강화
+  - workflow-state.sh implementing 메시지에 '따를 기존 패턴' 참조 안내 추가
+  - plan 구현자 프롬프트에 패턴 테이블 포함
+  - verify 검증자 프롬프트에 패턴 테이블 명시적 포함
+  - review-plan 패턴 일관성 검수 항목 구체화
+- **feat**: stop-guard에 tested/completing 상태 통과 추가
+- **change**: 워크플로 테이블 8단계 '커밋' → `/forge-flow:complete`로 변경
+- **affected**: complete SKILL.md (신규), clarify, plan, verify, test, review-req, review-plan SKILL.md, setup-workflow SKILL.md + 훅 스크립트 + 템플릿, 버전 마커
+
 ## v3.1.15
 
 - **feat**: plan/verify에 기존 코드 패턴 일관성 규칙 추가

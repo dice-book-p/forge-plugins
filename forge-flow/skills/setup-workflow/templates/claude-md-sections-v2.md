@@ -1,4 +1,4 @@
-<!-- forge-flow:version=3.1.9 -->
+<!-- forge-flow:version=3.2.0 -->
 <!-- SECTION: 작업 원칙 -->
 ## 작업 원칙
 
@@ -32,7 +32,7 @@
 | 5 | 구현 | plan/review-plan 통과 후 | S/M/L |
 | 6 | `/forge-flow:verify` | 구현 완료 즉시 | S/M/L |
 | 7 | `/forge-flow:test` | verify 통과 후 | M/L (S 조건부) |
-| 8 | 커밋 | test 통과/스킵 후 | S/M/L |
+| 8 | `/forge-flow:complete` | test 통과/스킵 후 | S/M/L |
 
 **규칙**:
 - `/forge-flow:clarify` 없이 구현 착수 금지
