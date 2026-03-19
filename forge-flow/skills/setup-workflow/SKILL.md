@@ -3,7 +3,7 @@ name: setup-workflow
 description: "forge-flow 워크플로를 프로젝트에 설치합니다."
 ---
 
-# /forge-flow:setup-workflow  `v3.2.1`
+# /forge-flow:setup-workflow  `v3.2.2`
 
 프로젝트에 forge-flow 워크플로를 설치합니다.
 단일 레포, 모노레포 모두 자동 감지하여 올바르게 설치합니다.
@@ -178,8 +178,18 @@ Q5. 기능 브랜치 패턴은? (예: feature/*, feat/*, 없음) [기본: featur
 `~/.claude/plugins/installed_plugins.json`에서 forge-flow 설치 경로를 탐지합니다:
 
 ```bash
+# installed_plugins.json은 version 1 또는 version 2 형식일 수 있음
+# v1: {"forge-flow@forge-plugins": {"installPath": "..."}}
+# v2: {"version": 2, "plugins": {"forge-flow@forge-plugins": [{"installPath": "..."}]}}
+
 # jq 사용
-PLUGIN_DIR=$(jq -r '.["forge-flow@forge-plugins"].installPath' ~/.claude/plugins/installed_plugins.json 2>/dev/null)
+PLUGIN_DIR=$(jq -r '
+  if .version == 2 then
+    .plugins["forge-flow@forge-plugins"][0].installPath
+  else
+    .["forge-flow@forge-plugins"].installPath
+  end
+' ~/.claude/plugins/installed_plugins.json 2>/dev/null)
 
 # python3 폴백
 if [ -z "$PLUGIN_DIR" ] || [ "$PLUGIN_DIR" = "null" ]; then
@@ -187,7 +197,11 @@ if [ -z "$PLUGIN_DIR" ] || [ "$PLUGIN_DIR" = "null" ]; then
 import json, os
 f = os.path.expanduser('~/.claude/plugins/installed_plugins.json')
 d = json.load(open(f))
-print(d.get('forge-flow@forge-plugins', {}).get('installPath', ''))
+if d.get('version') == 2:
+    entries = d.get('plugins', {}).get('forge-flow@forge-plugins', [])
+    print(entries[0].get('installPath', '') if entries else '')
+else:
+    print(d.get('forge-flow@forge-plugins', {}).get('installPath', ''))
 " 2>/dev/null)
 fi
 
@@ -533,7 +547,7 @@ git rm -f --cached .claude/hooks/*.sh 2>/dev/null
 
 결과 보고 형식:
 ```
-forge-flow v3.2.1 설치 완료
+forge-flow v3.2.2 설치 완료
 
 [루트 설치 항목]
   ✅ CLAUDE.md      — 워크플로 섹션 + 브랜치 전략 + 빌드 명령

@@ -1,5 +1,12 @@
 # forge-flow Changelog
 
+## v3.2.2
+
+- **fix**: `installed_plugins.json` version 2 형식 대응
+  - v2: `.plugins["key"][0].installPath` 구조 지원
+  - jq + python3 폴백 모두 수정
+- **affected**: setup-workflow SKILL.md
+
 ## v3.2.1
 
 - **feat**: 훅 스크립트 절대경로 참조 — 프로젝트에 스크립트 복사 불필요
