@@ -191,6 +191,18 @@ PASS / CONCERNS / REWORK / FAIL + 근거
 
 > **재작업 연속 3회 시 실패로 에스컬레이션**: 같은 항목이 반복 실패하면 요구사항 자체에 문제가 있을 가능성 높음.
 
+**주의 판정 시 AskUserQuestion 호출**:
+```
+question: "경미한 이슈가 발견되었습니다. 어떻게 진행할까요?"
+header: "주의"
+options:
+  - label: "수용 — 진행 (Recommended)"
+    description: "경미한 이슈를 인지하고 다음 단계로 진행합니다"
+  - label: "수정 후 재검수"
+    description: "이슈를 수정한 뒤 review-req를 다시 실행합니다"
+multiSelect: false
+```
+
 **재작업 처리 흐름**:
 1. 문제점을 사용자에게 보고
 2. 상태 파일의 `rework_count`를 +1 (`rework_count` ≥ 3이면 실패로 에스컬레이션)

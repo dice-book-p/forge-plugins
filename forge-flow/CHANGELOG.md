@@ -16,7 +16,11 @@
 - **feat**: L규모 자가 체크포인트
   - 구현 50% 시점에서 패턴 준수 + AC 충족 자가 점검
   - design 문서의 구현 계획에 체크리스트 포함 (L규모만)
-- **affected**: verify, review-req, test, clarify, plan, complete SKILL.md
+- **fix**: AskUserQuestion 일관성 정리
+  - review-req/review-plan CONCERNS 판정 시 AskUserQuestion 템플릿 추가
+  - plan 검증 강도 선택지 중복 제거 (추천 + 나머지만 표시)
+  - complete design 문서 처리에서 knowledge-hub 의존 옵션 제거 (삭제/보관만)
+- **affected**: verify, review-req, review-plan, test, clarify, plan, complete SKILL.md
 
 ## v3.2.2
 

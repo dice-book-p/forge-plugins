@@ -125,19 +125,17 @@ design 문서의 `## 구현 계획` 섹션에 추가:
 question: "검증 강도를 선택하세요."
 header: "검증 강도"
 options:
-  - label: "{규모별 추천 강도} (Recommended)"
+  - label: "{추천 강도} (Recommended)"
     description: "{추천 근거}"
-  - label: "경량 (0) — 교차검증 스킵"
-    description: "메인 세션만 검수합니다. 단순 변경에 적합"
-  - label: "표준 (1) — 교차검증 1회"
-    description: "메인 + 독립 검증자 1명으로 교차검수"
-  - label: "강화 (2+) — 검증팀 구성"
-    description: "메인 + 관점별 검증팀을 구성합니다"
+  - label: "{나머지 옵션 1}"
+    description: "{설명}"
+  - label: "{나머지 옵션 2}"
+    description: "{설명}"
 multiSelect: false
 ```
 
-> 추천 옵션은 선택지 최상단에 위치하되, 추천이 아닌 다른 강도도 선택 가능합니다.
-> 추천이 "표준 (1)"이면 "표준 (1) — 교차검증 1회 (Recommended)"가 첫 번째 옵션.
+> 추천 옵션을 최상단에 `(Recommended)` 표시로 배치하고, **나머지 옵션만** 아래에 나열합니다 (추천과 중복 금지).
+> 예: S규모 → 경량(0) (Recommended) / 표준(1) / 강화(2+) — 3개만 표시.
 
 design 문서의 `## 검증 강도` 섹션에 기록:
 ```markdown

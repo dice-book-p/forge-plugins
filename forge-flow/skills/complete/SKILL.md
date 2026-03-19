@@ -82,33 +82,13 @@ header: "design 문서"
 options:
   - label: "삭제 (Recommended)"
     description: "design 문서를 삭제합니다. 작업 내용은 커밋에 반영되어 있습니다"
-  - label: "요약 보존"
-    description: "핵심 내용을 knowledge-hub에 저장한 뒤 삭제합니다"
   - label: "보관"
     description: ".forge-flow/archive/ 에 이동하여 보관합니다"
 multiSelect: false
 ```
 
 - "삭제" → design 파일 삭제
-- "요약 보존" → design 문서의 요구사항 + AC + 검수 이력을 `mcp__knowledge-hub__save_knowledge`로 저장 (domain: `project`, tags: `decision, design`) → design 파일 삭제
 - "보관" → `.forge-flow/archive/` 디렉토리로 이동 (없으면 생성)
-
-**요약 보존 시 저장 형식**:
-```
-[제목] {작업명} — {목적 한 줄}
-
-[요구사항]
-{AC 목록}
-
-[구현 요약]
-{구현 계획의 변경 대상 파일 목록}
-
-[검수 이력]
-{검수 결과 + 이력 요약}
-
-[주의사항]
-{작업 중 발견된 gotcha나 주의점}
-```
 
 ### 4단계: Rework 교훈 기록 (조건부)
 
