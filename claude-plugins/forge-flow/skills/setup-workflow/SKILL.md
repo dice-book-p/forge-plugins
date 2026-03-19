@@ -3,7 +3,7 @@ name: setup-workflow
 description: "forge-flow 워크플로를 프로젝트에 설치합니다."
 ---
 
-# /forge-flow:setup-workflow  `v3.1.7`
+# /forge-flow:setup-workflow  `v3.2.0`
 
 프로젝트에 forge-flow 워크플로를 설치합니다.
 단일 레포, 모노레포 모두 자동 감지하여 올바르게 설치합니다.
@@ -236,7 +236,7 @@ mkdir -p .forge-flow/state/    # 세션별 상태 파일
 
 ```bash
 #!/bin/bash
-# forge-flow v3.1.6 UserPromptSubmit Hook
+# forge-flow v3.2.0 UserPromptSubmit Hook
 # 워크플로 진입 보장 + 상태 알림 + orphan 감지 + 에이전트팀 팀원 감지
 #
 # 등록: settings.local.json hooks.UserPromptSubmit
@@ -299,11 +299,15 @@ if [ -f "$STATE_FILE" ]; then
     reviewing-plan)
       echo "{\"additionalContext\": \"[WORKFLOW] 설계 검수 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
     implementing)
-      echo "{\"additionalContext\": \"[WORKFLOW] 구현 중 (규모: $SCALE). 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 시작 전이라면 /compact 권장. 구현 중간에는 피하세요.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 구현 중 (규모: $SCALE). design 문서의 '따를 기존 패턴' 섹션을 반드시 참조하여 기존 코드 패턴과 일관되게 구현하세요. 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 시작 전이라면 /compact 권장. 구현 중간에는 피하세요.\"}" ;;
     verifying)
       echo "{\"additionalContext\": \"[WORKFLOW] 검수 진행 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 결과 맥락이 손실될 수 있습니다.\"}" ;;
     verified)
-      echo "{\"additionalContext\": \"[WORKFLOW] 검수 완료. 커밋 가능. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 커밋해도 안전합니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW] 검수 완료. /forge-flow:complete로 작업을 마무리하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 마무리해도 안전합니다.\"}" ;;
+    tested)
+      echo "{\"additionalContext\": \"[WORKFLOW] 테스트 완료. /forge-flow:complete로 작업을 마무리하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 마무리해도 안전합니다.\"}" ;;
+    completing)
+      echo "{\"additionalContext\": \"[WORKFLOW] 작업 마무리 중. design: $DESIGN_FILE\"}" ;;
     completed)
       echo "{\"additionalContext\": \"[WORKFLOW] 작업 완료.\"}" ;;
     *)
@@ -345,7 +349,7 @@ exit 0
 
 ```bash
 #!/bin/bash
-# forge-flow v3.1.6 Stop Hook (command 타입)
+# forge-flow v3.2.0 Stop Hook (command 타입)
 # 워크플로 미완료 시 종료 차단 + circuit breaker + 에이전트팀 팀원 바이패스
 #
 # 등록: settings.local.json hooks.Stop
@@ -386,7 +390,7 @@ fi
 PHASE=$(_json_read '.phase' "$STATE_FILE")
 
 # 2. 이미 검수 완료면 → 즉시 통과
-if [ "$PHASE" = "verified" ] || [ "$PHASE" = "completed" ]; then
+if [ "$PHASE" = "verified" ] || [ "$PHASE" = "tested" ] || [ "$PHASE" = "completing" ] || [ "$PHASE" = "completed" ]; then
   exit 0
 fi
 
@@ -519,7 +523,7 @@ git add -f .claude/hooks/*.sh
 
 결과 보고 형식:
 ```
-forge-flow v3.1.7 설치 완료
+forge-flow v3.2.0 설치 완료
 
 [루트 설치 항목]
   ✅ CLAUDE.md      — 워크플로 섹션 + 브랜치 전략 + 빌드 명령
@@ -528,7 +532,8 @@ forge-flow v3.1.7 설치 완료
 
 [워크플로 순서]
   /forge-flow:clarify → /forge-flow:review-req → /forge-flow:plan
-  → (조건부) /forge-flow:review-plan → 구현 → /forge-flow:verify → 커밋
+  → (조건부) /forge-flow:review-plan → 구현 → /forge-flow:verify
+  → /forge-flow:test → /forge-flow:complete
 
 [스킬 목록]
   /forge-flow:clarify      요구사항 명확화 (자동)
@@ -536,6 +541,8 @@ forge-flow v3.1.7 설치 완료
   /forge-flow:plan         구현 계획 설계 (자동)
   /forge-flow:review-plan  설계 검수 (조건부)
   /forge-flow:verify       작업 종합 검수 (자동)
+  /forge-flow:test         실행 테스트 (자동)
+  /forge-flow:complete     작업 마무리 — 커밋 + 정리 (자동)
   /forge-flow:build-check  빌드 검증 (verify 내부)
   /forge-flow:fe-check     FE 검증 (verify 내부, FE 프로젝트만)
 ```

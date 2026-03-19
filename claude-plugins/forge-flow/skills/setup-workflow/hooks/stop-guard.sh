@@ -1,5 +1,5 @@
 #!/bin/bash
-# forge-flow v3.1.6 Stop Hook (command 타입)
+# forge-flow v3.2.0 Stop Hook (command 타입)
 # 워크플로 미완료 시 종료 차단 + circuit breaker + 에이전트팀 팀원 바이패스
 #
 # 등록: settings.local.json hooks.Stop
@@ -40,7 +40,7 @@ fi
 PHASE=$(_json_read '.phase' "$STATE_FILE")
 
 # 2. 이미 검수 완료면 → 즉시 통과
-if [ "$PHASE" = "verified" ] || [ "$PHASE" = "completed" ]; then
+if [ "$PHASE" = "verified" ] || [ "$PHASE" = "tested" ] || [ "$PHASE" = "completing" ] || [ "$PHASE" = "completed" ]; then
   exit 0
 fi
 
