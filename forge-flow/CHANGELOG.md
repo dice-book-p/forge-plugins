@@ -1,5 +1,15 @@
 # forge-flow Changelog
 
+## v3.3.1
+
+- **fix**: 에이전트팀 vs 서브에이전트 결정 로직 명확화
+  - verify, review-req, test, plan 각 스킬에 명시적 의사결정 트리 추가
+  - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 환경변수 체크를 최우선 분기 조건으로 배치
+  - 서브에이전트 폴백은 환경변수 미설정 시에만 적용됨을 명시
+  - test: 도메인 1개인 경우에도 에이전트팀 활성화 시 팀원 1명으로 구성 (서브에이전트 아님)
+  - verify: 관점 1개인 경우에도 에이전트팀 활성화 시 팀원 1명으로 구성
+- **affected**: verify, review-req, test, plan SKILL.md
+
 ## v3.3.0
 
 - **feat**: 세션 기반 → 작업(Task) 기반 상태 관리로 전환
