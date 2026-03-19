@@ -1,5 +1,24 @@
 # forge-flow Changelog
 
+## v3.2.1
+
+- **feat**: 훅 스크립트 절대경로 참조 — 프로젝트에 스크립트 복사 불필요
+  - `installed_plugins.json`에서 플러그인 설치 경로 자동 탐지
+  - `settings.local.json` / `settings.json` hooks를 절대 경로로 등록
+  - 기존 `.claude/hooks/*.sh` 파일 자동 정리 (마이그레이션)
+  - worktree(에이전트팀)에서 훅 파일 미발견 문제 해결
+- **feat**: 에이전트팀 기본 활성화
+  - setup-workflow 에이전트팀 선택 기본값 `[Y/n]`으로 변경
+  - review-req: M/L 규모에서 에이전트팀 기본 사용
+  - verify: 검증 강도 1+에서 에이전트팀 기본 사용
+  - test: 테스트 팀 에이전트팀 기본 사용
+  - plan: 에이전트팀 동적 구성 기본 활성화
+  - 서브에이전트는 에이전트팀이 과한 경우(단일 작업자)만 폴백
+- **change**: setup-workflow 단계 재구성 — 4.4~4.8 제거, 4.2 플러그인 경로 탐지 추가, 4.7 마이그레이션 추가
+- **change**: --update 흐름 — 스크립트 복사 대신 경로 갱신 + 기존 파일 정리
+- **change**: --purge/--reset 흐름 — 프로젝트 훅 파일 삭제 대신 settings hooks 블록 제거
+- **affected**: setup-workflow SKILL.md + 훅 스크립트, review-req, verify, test, plan SKILL.md, 버전 마커
+
 ## v3.2.0
 
 - **feat**: `/forge-flow:complete` 신규 스킬 — 작업 마무리 단계 추가
