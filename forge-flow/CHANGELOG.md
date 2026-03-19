@@ -1,5 +1,33 @@
 # forge-flow Changelog
 
+## v3.3.0
+
+- **feat**: 세션 기반 → 작업(Task) 기반 상태 관리로 전환
+  - 상태 파일: `state-${SESSION_ID}.json` → `{task_id}.json` (task_id = design 파일명)
+  - `session_id`는 파일명이 아닌 필드로 관리 — 세션 간 작업 재개 가능
+  - `task_id`, `updated_at` 필드 추가
+- **feat**: clarify에 Task Discovery 라우터 추가
+  - 현재 세션 바인딩 작업 → 이어서/추가 요구사항/새 작업 선택
+  - 다른 세션 미완료 작업 → 목록 표시 + 이어서 진행 또는 새 작업
+  - orphan design 파일 → 기반으로 보완 작업 또는 archive 이동
+  - archive 참고용 안내 (이전 완료 작업 참조)
+- **fix**: orphan design 파일 자동 삭제 제거
+  - workflow-state.sh: 알림만 표시, 삭제는 clarify Task Discovery에서 사용자 선택으로 처리
+- **fix**: 완료 후 이어서 작업 시 맥락 단절 해소
+  - 미완료 작업 재개: session_id 갱신으로 다른 세션에서 이어서 진행
+  - 추가 요구사항: 기존 design 기반으로 AC 추가/수정 후 재검수
+- **change**: 훅 스크립트 상태 탐색을 session_id 필드 스캔으로 변경
+  - workflow-state.sh: 파일명이 아닌 JSON session_id 필드로 바인딩 탐색
+  - stop-guard.sh: 동일하게 session_id 필드 스캔
+  - 구버전 state-*.json 자동 마이그레이션 (하위호환)
+- **fix**: verify/test `rework_count` 재진입 시 리셋 방지
+  - 기존: 매번 0으로 리셋 → 3회 REWORK 에스컬레이션 불가능
+  - 수정: 최초 진입(이전 phase 기준) 시에만 리셋, REWORK 후 재진입 시 유지
+- **change**: 상태 파일 TTL 7일 → 30일 (작업 기반이므로 여유 확보)
+- **change**: 훅 메시지에 task_id 포함 — `[WORKFLOW:{task_id}]` 형식
+- **affected**: workflow-state.sh, stop-guard.sh, clarify, review-req, plan, review-plan, verify, test, complete SKILL.md, claude-md-sections-v2.md, plugin.json
+- **requires_update**: 3.3.0 (훅 + CLAUDE.md 템플릿 변경)
+
 ## v3.2.3
 
 - **feat**: 검증 결과 숙의(Deliberation) 단계 강화

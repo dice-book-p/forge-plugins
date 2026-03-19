@@ -9,7 +9,7 @@ test(실행 테스트) 통과 또는 스킵 후, 작업을 마무리합니다.
 ## 선행 조건 검사
 
 실행 전 반드시 확인:
-1. 상태 파일 존재 → 없으면: "워크플로가 시작되지 않았습니다. `/forge-flow:clarify`로 시작하세요."
+1. 현재 세션에 바인딩된 상태 파일 탐색 → `.forge-flow/state/`에서 `session_id`가 현재 세션(`${CLAUDE_SESSION_ID}`)과 일치하는 `{task_id}.json` 파일 탐색 → 없으면: "워크플로가 시작되지 않았습니다. `/forge-flow:clarify`로 시작하세요."
 2. phase가 `"tested"` 또는 `"verified"`인지 확인 → 아니면: "현재 `{phase}` 단계입니다. verify/test를 먼저 통과하세요."
 3. `design_file`이 존재하는 파일 경로인지 확인 → 없으면: "설계 문서를 찾을 수 없습니다."
 
@@ -100,12 +100,13 @@ REWORK 이력에서 교훈을 추출하여 `.forge-flow/rework-log.md`에 기록
 
 ### 5단계: 정리 + 완료 보고
 
-1. 상태 파일 삭제: `rm -f .forge-flow/state/state-${CLAUDE_SESSION_ID}.json`
+1. 상태 파일 정리: phase를 `"completed"`로 갱신한 뒤 삭제 (`rm -f .forge-flow/state/{task_id}.json`). 삭제 실패 시에도 훅이 `"completed"` phase를 감지하여 다음 세션에서 자동 정리합니다.
 2. 완료 보고:
 
 ```
 [작업 완료]
+  작업: {task_id}
   커밋: {커밋 해시} 또는 "스킵"
-  design: {삭제 / knowledge-hub 저장 / archive 보관}
+  design: {삭제 / archive 보관}
   워크플로 파일 정리 완료
 ```

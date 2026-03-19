@@ -11,7 +11,7 @@ description: "작업 내용 종합 검수 — 구현 완료 시 빌드 검증 + 
 ## 선행 조건 검사
 
 실행 전 반드시 확인:
-1. 상태 파일 존재 → 없으면: "워크플로가 시작되지 않았습니다. `/forge-flow:clarify`로 시작하세요."
+1. 현재 세션에 바인딩된 상태 파일 탐색 → `.forge-flow/state/`에서 `session_id`가 현재 세션(`${CLAUDE_SESSION_ID}`)과 일치하는 `{task_id}.json` 파일 탐색 → 없으면: "워크플로가 시작되지 않았습니다. `/forge-flow:clarify`로 시작하세요."
 2. phase가 `"implementing"` 또는 `"verifying"`인지 확인 → 아니면: "현재 `{phase}` 단계입니다. 구현 완료 후 verify를 실행하세요."
 3. `design_file`이 존재하는 파일 경로인지 확인 → 없으면: "설계 문서를 찾을 수 없습니다."
 
@@ -19,10 +19,11 @@ description: "작업 내용 종합 검수 — 구현 완료 시 빌드 검증 + 
 
 실행 시작 시:
 ```json
-{ "phase": "verifying", "rework_count": 0 }
+{ "phase": "verifying" }
 ```
 
-> `rework_count`는 verify 진입 시 0으로 초기화합니다 (이전 phase의 rework과 독립).
+> `rework_count`는 **최초 verify 진입 시에만** 0으로 초기화합니다. REWORK 후 재진입 시에는 기존 `rework_count`를 유지합니다 (3회 에스컬레이션 추적을 위해).
+> 최초 진입 판단: 이전 phase가 `"implementing"`이면 최초 진입 → `rework_count: 0`. 이전 phase가 `"verifying"`이면 재진입 → 유지.
 
 ## 검증 강도 확인
 

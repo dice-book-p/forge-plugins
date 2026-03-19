@@ -1,4 +1,4 @@
-<!-- forge-flow:version=3.2.1 -->
+<!-- forge-flow:version=3.3.0 -->
 <!-- SECTION: 작업 원칙 -->
 ## 작업 원칙
 
@@ -40,7 +40,7 @@
 - `.forge-flow/design/` 문서의 AC 항목을 모두 충족해야 작업 완료
 - review-req 통과 후 **사용자 확인** → plan → implement → verify까지 자동 진행 (위험 작업 제외)
 
-**상태 파일**: `.forge-flow/state/state-${CLAUDE_SESSION_ID}.json` — 현재 워크플로 단계 추적
+**상태 파일**: `.forge-flow/state/{task-id}.json` — 작업별 워크플로 단계 추적 (세션 간 재개 가능)
 
 <!-- SECTION: 빌드 명령 -->
 ## 빌드 명령

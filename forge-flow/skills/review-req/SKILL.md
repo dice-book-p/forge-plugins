@@ -14,7 +14,7 @@ clarify에서 작성된 design 문서의 요구사항 품질을 에이전트팀 
 ## 선행 조건 검사
 
 실행 전 반드시 확인:
-1. 상태 파일 존재 → 없으면: "워크플로가 시작되지 않았습니다. `/forge-flow:clarify`로 시작하세요."
+1. 현재 세션에 바인딩된 상태 파일 탐색 → `.forge-flow/state/`에서 `session_id`가 현재 세션(`${CLAUDE_SESSION_ID}`)과 일치하는 `{task_id}.json` 파일 탐색 → 없으면: "워크플로가 시작되지 않았습니다. `/forge-flow:clarify`로 시작하세요."
 2. `design_file`이 존재하는 파일 경로인지 확인 → 없으면: "설계 문서를 찾을 수 없습니다. `/forge-flow:clarify`를 먼저 실행하세요."
 
 ## 상태 파일 갱신
