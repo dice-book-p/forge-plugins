@@ -1,5 +1,15 @@
 # forge-flow Changelog
 
+## v3.3.3
+
+- **fix**: 에이전트팀 spawn을 실제 도구 기반으로 정확히 기술
+  - TeamCreate → TaskCreate → Agent(team_name, name) → SendMessage → TeamDelete 워크플로 명시
+  - `Agent` 도구 + `team_name` + `name` 파라미터 = 에이전트팀 팀원
+  - `Agent` 도구 + `team_name` 없음 = 서브에이전트 (폴백)
+  - verify, review-req, test, plan 4개 스킬 모두 동일 패턴 적용
+  - 팀원 결과 수신: 자동 메시지 전달 (폴링 불필요) 명시
+- **affected**: verify, review-req, test, plan SKILL.md
+
 ## v3.3.2
 
 - **fix**: 에이전트팀 spawn 방식을 기술적으로 명확히 구분
