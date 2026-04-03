@@ -23,6 +23,18 @@
 - **change**: --update 시 프로젝트별 훅 등록 자동 정리 (글로벌로 이전)
   - v3.0.0~v3.1.5: .claude/hooks/*.sh 삭제
   - v3.1.6~v3.3.3: settings.local.json + settings.json hooks 블록 제거
+- **feat**: 평가자 모델 스펙 일관화 — verify/review-req 검증자에 `model: "sonnet"` 명시
+  - 기존: 세션 모델 상속 (비일관적) → 변경: test와 동일하게 `model: "sonnet"` 통일
+  - 비용 절감 + 평가 결과 일관성 확보
+- **feat**: 에이전트 응답 원칙 추가 — verify/test/review-req 프롬프트에 토큰 효율 지침
+  - PASS는 한 줄 요약, FAIL만 상세 (file:line + 수정 제안)
+  - 전체 응답 2,000 토큰 이내 권장 → 숙의 품질 향상
+- **feat**: Sprint Contract — plan 단계에서 `검증 방법` 테이블 사전 합의
+  - design 문서에 `### 검증 방법` 섹션 추가 (AC별 검증 방식 + 도구/명령)
+  - verify 검증자에게 검증 방법 테이블 전달 → 검증 누락 방지
+- **feat**: Context 오염 방지 — plan 구현자/리뷰어 프롬프트에 컨텍스트 관리 지침
+  - 긴 로그는 파일 저장 후 핵심만 보고, [ERROR]/[ISSUE] 태그 표시
+  - 장기 구현 시 context window 안정성 향상
 - **affected**: workflow-state.sh, stop-guard.sh, dangerous-cmd-guard.sh, review-req, review-plan, verify, test, plan, clarify SKILL.md, setup-workflow SKILL.md + 템플릿, plugin.json, marketplace.json, CLAUDE.md
 - **requires_update**: 3.4.0 (훅 아키텍처 변경 + CLAUDE.md 에이전트팀 필수화)
 
