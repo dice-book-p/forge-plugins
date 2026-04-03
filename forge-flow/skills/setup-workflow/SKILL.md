@@ -3,7 +3,7 @@ name: setup-workflow
 description: "forge-flow 워크플로를 프로젝트에 설치합니다."
 ---
 
-# /forge-flow:setup-workflow  `v3.2.2`
+# /forge-flow:setup-workflow  `v3.4.0`
 
 프로젝트에 forge-flow 워크플로를 설치합니다.
 단일 레포, 모노레포 모두 자동 감지하여 올바르게 설치합니다.
@@ -238,10 +238,10 @@ mkdir -p .forge-flow/state/    # 세션별 상태 파일
 
 ```bash
 #!/bin/bash
-# forge-flow v3.2.0 UserPromptSubmit Hook
+# forge-flow v3.4.0 UserPromptSubmit Hook
 # 워크플로 진입 보장 + 상태 알림 + orphan 감지 + 에이전트팀 팀원 감지
 #
-# 등록: settings.local.json hooks.UserPromptSubmit
+# 등록: ~/.claude/settings.json hooks.UserPromptSubmit (글로벌)
 # stdin: (사용자 프롬프트 정보)
 # stdout: { "additionalContext": "..." }
 
@@ -355,10 +355,10 @@ exit 0
 
 ```bash
 #!/bin/bash
-# forge-flow v3.2.0 Stop Hook (command 타입)
+# forge-flow v3.4.0 Stop Hook (command 타입)
 # 워크플로 미완료 시 종료 차단 + circuit breaker + 에이전트팀 팀원 바이패스
 #
-# 등록: settings.local.json hooks.Stop
+# 등록: ~/.claude/settings.json hooks.Stop (글로벌)
 # stdin: { "stop_hook_active": bool, "last_assistant_message": "..." }
 # stdout: { "decision": "block", "reason": "..." } 또는 빈 출력(허용)
 
@@ -427,9 +427,9 @@ exit 0
 
 ```bash
 #!/bin/bash
-# forge-flow v3 PreToolUse Hook — 위험 작업 차단
+# forge-flow v3.4.0 PreToolUse Hook — 위험 작업 차단
 #
-# 등록: settings.local.json hooks.PreToolUse (matcher: "Bash")
+# 등록: ~/.claude/settings.json hooks.PreToolUse (글로벌, matcher: "Bash")
 # stdin: { "tool_name": "Bash", "tool_input": { "command": "..." } }
 # stdout: { "permissionDecision": "deny", "reason": "..." } 또는 빈 출력(허용)
 

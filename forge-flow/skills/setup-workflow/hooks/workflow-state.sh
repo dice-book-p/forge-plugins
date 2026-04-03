@@ -1,8 +1,8 @@
 #!/bin/bash
-# forge-flow v3.3.0 UserPromptSubmit Hook
+# forge-flow v3.4.0 UserPromptSubmit Hook
 # 작업(Task) 기반 상태 관리 + 워크플로 진입 보장 + orphan 감지 + 에이전트팀 팀원 감지
 #
-# 등록: settings.local.json hooks.UserPromptSubmit
+# 등록: ~/.claude/settings.json hooks.UserPromptSubmit (글로벌)
 # stdin: (사용자 프롬프트 정보)
 # stdout: { "additionalContext": "..." }
 

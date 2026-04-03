@@ -1,7 +1,7 @@
 #!/bin/bash
-# forge-flow v3 PreToolUse Hook — 위험 작업 차단
+# forge-flow v3.4.0 PreToolUse Hook — 위험 작업 차단
 #
-# 등록: settings.local.json hooks.PreToolUse (matcher: "Bash")
+# 등록: ~/.claude/settings.json hooks.PreToolUse (글로벌, matcher: "Bash")
 # stdin: { "tool_name": "Bash", "tool_input": { "command": "..." } }
 # stdout: { "permissionDecision": "deny", "reason": "..." } 또는 빈 출력(허용)
 

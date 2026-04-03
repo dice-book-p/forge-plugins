@@ -257,7 +257,7 @@ design 문서의 `## 검수 결과`, `## 검수 이력` 섹션에 기록:
 
 PASS 시:
 ```json
-{ "phase": "reviewing-req", "stop_count": 0, "rework_count": 0 }
+{ "phase": "req-reviewed", "stop_count": 0, "rework_count": 0 }
 ```
 
 REWORK 시:

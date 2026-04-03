@@ -7,8 +7,10 @@
   - S규모 review-req: 메인 세션 자기 검수 → 에이전트팀 1명 외부 검수
   - review-plan (M/L): 메인 세션 자기 검수 → 에이전트팀 외부 검수 (M:1명, L:2명)
   - S규모 verify: 기본 검증 강도 0→1 (에이전트팀 1명 필수)
+  - verify 메인 세션: 빌드 전용 오케스트레이터로 축소 (코드 리뷰/AC 대조/엣지케이스 → 에이전트팀 위임)
   - L규모 자가 체크포인트 → 에이전트팀 1명 중간 검수
   - 검증 강도 0(경량) 제거 — 최소 강도 1 (외부 검수 필수)
+- **feat**: 수렴 검증(Convergence Verification) — verify/test PASS 후 새 검증자로 확인 라운드, 0건까지 반복
 - **feat**: 평가자 캘리브레이션 — rework-log 반복 패턴(×2+)을 verify/test 평가자 프롬프트에 주입
 - **feat**: 글로벌 훅 아키텍처 — 프로젝트별 훅 등록 → 글로벌 1회 등록
   - `--global` 명령 추가: `~/.claude/forge-flow-hooks/`에 스크립트 복사 + `~/.claude/settings.json` 등록

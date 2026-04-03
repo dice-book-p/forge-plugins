@@ -1,4 +1,4 @@
-<!-- forge-flow:version=3.3.0 -->
+<!-- forge-flow:version=3.4.0 -->
 <!-- SECTION: 작업 원칙 -->
 ## 작업 원칙
 
@@ -91,6 +91,5 @@
 ### 모델 사용 전략
 | 작업 유형 | 모델 | 이유 |
 |-----------|------|------|
-| 분석/검증/플랜 (review-req, review-plan, verify) | 세션 모델 상속 | 사용자가 선택한 모델 수준 유지 |
+| 검증/플랜 검수 (review-req, review-plan, verify, test) | sonnet 고정 | 검증자 프롬프트에 model: "sonnet" 명시 |
 | 구현/문서작성 (implementer, reviewer) | sonnet 고정 | 명확한 지시 기반 실행, 속도+비용 최적 |
-| 실행 테스트 (test 테스터) | sonnet 고정 | 브라우저/API 테스트는 지시 실행 중심, 비용 최적 |

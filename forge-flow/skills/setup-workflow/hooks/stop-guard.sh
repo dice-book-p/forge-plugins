@@ -1,8 +1,8 @@
 #!/bin/bash
-# forge-flow v3.3.0 Stop Hook (command 타입)
+# forge-flow v3.4.0 Stop Hook (command 타입)
 # 작업(Task) 기반 — 워크플로 미완료 시 종료 차단 + circuit breaker + 에이전트팀 팀원 바이패스
 #
-# 등록: settings.local.json hooks.Stop
+# 등록: ~/.claude/settings.json hooks.Stop (글로벌)
 # stdin: { "stop_hook_active": bool, "last_assistant_message": "..." }
 # stdout: { "decision": "block", "reason": "..." } 또는 빈 출력(허용)
 
