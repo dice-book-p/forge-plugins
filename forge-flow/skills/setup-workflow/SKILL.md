@@ -11,10 +11,13 @@ description: "forge-flow 워크플로를 프로젝트에 설치합니다."
 ## ARGUMENTS
 
 ```
-/forge-flow:setup-workflow           # 신규 설치 또는 업그레이드 자동 감지
-/forge-flow:setup-workflow --update  # 변경된 항목만 감지 → 선택 적용
-/forge-flow:setup-workflow --reset   # 전체 제거 → Q&A → 재설치
-/forge-flow:setup-workflow --purge   # 전체 제거만 (확인 후 실행)
+/forge-flow:setup-workflow                # 프로젝트 워크플로 설정 (CLAUDE.md + .forge-flow/)
+/forge-flow:setup-workflow --global       # 글로벌 훅 설치 (~/.claude/forge-flow-hooks/ + 글로벌 settings.json)
+/forge-flow:setup-workflow --global --update  # 글로벌 훅 스크립트 갱신
+/forge-flow:setup-workflow --update       # 프로젝트 CLAUDE.md 갱신 + 프로젝트별 훅 정리
+/forge-flow:setup-workflow --reset        # 전체 제거 → Q&A → 재설치
+/forge-flow:setup-workflow --purge        # 프로젝트 제거 (글로벌 훅 유지)
+/forge-flow:setup-workflow --purge --global   # 프로젝트 + 글로벌 훅 모두 제거
 ```
 
 ---
@@ -24,11 +27,10 @@ description: "forge-flow 워크플로를 프로젝트에 설치합니다."
 ```
 1단계: 프로젝트 상태 판별 (기존 vs 신규) + 구조 감지 (단일/모노레포)
 2단계: 정보 수집 (자동 감지 + 확인 / Q&A)
-3단계: 사용자 선택 (옵션)
 4단계: 설치 실행
   4.1 CLAUDE.md 패치 (루트)
   4.2 플러그인 설치 경로 탐지
-  4.3 hooks 등록 (루트, 절대 경로)
+  4.3 글로벌 훅 확인
   4.4 디렉토리 생성 (루트)
   4.5 조건부 설정
   4.6 .gitignore 업데이트 (루트)
@@ -141,17 +143,6 @@ Q5. 기능 브랜치 패턴은? (예: feature/*, feat/*, 없음) [기본: featur
 
 ---
 
-## 3단계: 사용자 선택 (옵션)
-
-```
-에이전트팀 기능을 활성화할까요? (병렬 가능 시 동적 팀 구성) [Y/n]
-```
-
-- **활성화 시 (기본값)**: settings.local.json에 환경변수 주입. 검증/구현/테스트에서 에이전트팀을 기본으로 활용
-- **비활성화 시**: 단일 세션 워크플로. 서브에이전트 교차검증으로 대체
-
----
-
 ## 4단계: 설치 실행
 
 사용자 동의 후 실행합니다.
@@ -170,7 +161,7 @@ Q5. 기능 브랜치 패턴은? (예: feature/*, feat/*, 없음) [기본: featur
 | `{CHANGE_PROPAGATION_TABLE}` | 모노레포 시 전파 체인, 단일 시 "없음" |
 | `{BASE_BRANCH}` | 기준 브랜치 |
 | `{BRANCH_PATTERN}` | 기능 브랜치 패턴 |
-| `{AGENT_TEAMS_SECTION}` | 에이전트팀 활성화 시 섹션 삽입, 비활성 시 빈 문자열 |
+| _(에이전트팀 섹션)_ | 템플릿에 직접 포함 (필수, 플레이스홀더 없음) |
 
 ### 4.2 플러그인 설치 경로 탐지
 
@@ -215,39 +206,16 @@ HOOKS_DIR="${PLUGIN_DIR}/skills/setup-workflow/hooks"
 - `${HOOKS_DIR}/stop-guard.sh`
 - `${HOOKS_DIR}/dangerous-cmd-guard.sh`
 
-### 4.3 hooks 등록 (절대 경로)
+### 4.3 글로벌 훅 확인
 
-**훅 스크립트를 프로젝트에 복사하지 않습니다.** 플러그인 설치 경로의 스크립트를 **절대 경로**로 직접 참조합니다. 이 방식으로:
-- 프로젝트마다 스크립트 복사 불필요
-- 모노레포 서브프로젝트 복사 불필요
-- 에이전트팀 worktree에서도 절대 경로라 항상 찾을 수 있음
+프로젝트별 훅 등록은 하지 않습니다. 글로벌 훅 설치 여부를 확인합니다:
+- `~/.claude/forge-flow-hooks/` 디렉토리 존재 확인
+- `~/.claude/settings.json`에 forge-flow hooks 블록 존재 확인
 
-`settings.local.json` 훅 블록 형식 (절대 경로):
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [{
-      "matcher": "",
-      "hooks": [{"type": "command", "command": "bash {HOOKS_DIR}/workflow-state.sh"}]
-    }],
-    "Stop": [{
-      "matcher": "",
-      "hooks": [{"type": "command", "command": "bash {HOOKS_DIR}/stop-guard.sh"}]
-    }],
-    "PreToolUse": [{
-      "matcher": "Bash",
-      "hooks": [{"type": "command", "command": "bash {HOOKS_DIR}/dangerous-cmd-guard.sh"}]
-    }]
-  }
-}
-```
+**글로벌 훅 설치됨** → "글로벌 훅이 활성화되어 있습니다." 안내 → 다음 단계로
+**글로벌 훅 미설치** → "글로벌 훅이 설치되지 않았습니다." 안내 후 자동으로 --global 흐름 실행
 
-> `{HOOKS_DIR}`은 4.2에서 탐지한 실제 절대 경로로 치환합니다.
-> `settings.local.json`에 기존 내용이 있으면 `hooks` 블록만 병합합니다. 기존 `permissions`, `enabledMcpjsonServers` 등은 보존.
-
-**에이전트팀 활성화 시 `.claude/settings.json` 추가 등록**:
-
-팀원 worktree에서는 `settings.local.json`이 복사되지 않으므로, git-tracked인 `.claude/settings.json`에도 동일한 hooks 블록(절대 경로)을 등록합니다. 같은 머신에서 실행되므로 절대 경로가 유효합니다.
+> v3.4.0부터 훅은 글로벌로만 등록합니다. 프로젝트별 `settings.local.json` / `settings.json`에는 훅을 등록하지 않습니다.
 
 ### 4.4 디렉토리 생성 (루트만)
 
@@ -260,7 +228,7 @@ mkdir -p .forge-flow/state/    # 세션별 상태 파일
 
 ### 훅 스크립트 레퍼런스
 
-아래 3개 스크립트는 플러그인 설치 경로(`skills/setup-workflow/hooks/`)에 위치하며, **프로젝트에 복사하지 않습니다.** 4.3에서 등록한 절대 경로로 직접 실행됩니다.
+아래 3개 스크립트는 플러그인 설치 경로(`skills/setup-workflow/hooks/`)에 위치하며, `--global` 실행 시 `~/.claude/forge-flow-hooks/`로 복사됩니다.
 
 > 이 섹션은 훅 스크립트의 내용을 문서화한 **레퍼런스**입니다. 실제 실행되는 스크립트는 플러그인 설치 경로의 파일입니다.
 
@@ -278,6 +246,10 @@ mkdir -p .forge-flow/state/    # 세션별 상태 파일
 # stdout: { "additionalContext": "..." }
 
 INPUT=$(cat)
+
+# forge-flow 미설치 프로젝트에서는 즉시 종료 (글로벌 훅 안전 가드)
+[ -d ".forge-flow" ] || exit 0
+
 SESSION_ID="${CLAUDE_SESSION_ID}"
 STATE_FILE=".forge-flow/state/state-${SESSION_ID}.json"
 
@@ -391,6 +363,10 @@ exit 0
 # stdout: { "decision": "block", "reason": "..." } 또는 빈 출력(허용)
 
 INPUT=$(cat)
+
+# forge-flow 미설치 프로젝트에서는 즉시 종료 (글로벌 훅 안전 가드)
+[ -d ".forge-flow" ] || exit 0
+
 SESSION_ID="${CLAUDE_SESSION_ID}"
 STATE_FILE=".forge-flow/state/state-${SESSION_ID}.json"
 
@@ -459,6 +435,9 @@ exit 0
 
 INPUT=$(cat)
 
+# forge-flow 미설치 프로젝트에서는 즉시 종료 (글로벌 훅 안전 가드)
+[ -d ".forge-flow" ] || exit 0
+
 # jq 또는 python3 폴백
 if command -v jq >/dev/null 2>&1; then
   TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
@@ -493,10 +472,6 @@ exit 0
 | 조건 | 설정 |
 |------|------|
 | FE 프로젝트 감지 | fe-check 활성화 (CLAUDE.md에 FE 빌드 명령 추가) |
-| 에이전트팀 활성화 | 루트 `settings.local.json`에 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 환경변수 주입 |
-| 에이전트팀 활성화 | `.claude/settings.json`(프로젝트 공유)에도 hooks 블록(절대 경로) 병합 — 팀원 worktree에서 훅 동작 보장 |
-
-> **settings.json 이중 등록**: `settings.local.json`은 gitignore 대상이므로 팀원의 worktree에 복사되지 않습니다. 에이전트팀 활성화 시 `.claude/settings.json`에도 동일한 hooks 블록(절대 경로)을 등록합니다. 같은 머신에서 실행되므로 절대 경로가 유효합니다.
 
 ### 4.6 .gitignore 업데이트 (루트만)
 
@@ -537,27 +512,25 @@ git rm -f --cached .claude/hooks/*.sh 2>/dev/null
 |----------|---------|
 | CLAUDE.md 마커 | `forge-flow:version=X.X.X` 존재 확인 (루트) |
 | CLAUDE.md 워크플로 섹션 | `/forge-flow:clarify`, `/forge-flow:verify` 등 스킬명 포함 |
-| 플러그인 훅 스크립트 | `${HOOKS_DIR}/stop-guard.sh` 존재 + 실행 권한 |
-| 루트 settings 훅 | `{루트}/.claude/settings.local.json` hooks 키 존재 + **절대 경로** 등록 |
+| 글로벌 hooks | `~/.claude/settings.json` hooks 키 존재 + `~/.claude/forge-flow-hooks/` 경로 등록 확인 |
 | design 디렉토리 | `{루트}/.forge-flow/design/` 존재 |
 | .forge-flow 디렉토리 | `{루트}/.forge-flow/` 존재 |
 | 기존 훅 정리 | `{루트}/.claude/hooks/*.sh`가 **존재하지 않는지** 확인 (마이그레이션 완료) |
-| [에이전트팀] 환경변수 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 확인 |
-| [에이전트팀] settings.json | `.claude/settings.json`에 hooks 블록(절대 경로) 존재 확인 |
+| 환경변수 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 설정 확인 |
 
 결과 보고 형식:
 ```
-forge-flow v3.2.2 설치 완료
+forge-flow v3.4.0 설치 완료
 
 [루트 설치 항목]
   ✅ CLAUDE.md      — 워크플로 섹션 + 브랜치 전략 + 빌드 명령
-  ✅ hooks          — 플러그인 경로에서 절대 경로 참조 (Stop + UserPromptSubmit + PreToolUse)
+  ✅ hooks          — 글로벌 훅 활성화 (~/.claude/forge-flow-hooks/)
   ✅ .forge-flow/   — 설계 문서 + 세션별 상태 파일 디렉토리
 
 [훅 경로]
-  ${HOOKS_DIR}/workflow-state.sh
-  ${HOOKS_DIR}/stop-guard.sh
-  ${HOOKS_DIR}/dangerous-cmd-guard.sh
+  ~/.claude/forge-flow-hooks/workflow-state.sh
+  ~/.claude/forge-flow-hooks/stop-guard.sh
+  ~/.claude/forge-flow-hooks/dangerous-cmd-guard.sh
 
 [워크플로 순서]
   /forge-flow:clarify → /forge-flow:review-req → /forge-flow:plan
@@ -575,6 +548,77 @@ forge-flow v3.2.2 설치 완료
   /forge-flow:build-check  빌드 검증 (verify 내부)
   /forge-flow:fe-check     FE 검증 (verify 내부, FE 프로젝트만)
 ```
+
+---
+
+## --global 흐름
+
+글로벌 훅을 설치합니다. 모든 프로젝트에서 공유하는 훅 스크립트를 `~/.claude/forge-flow-hooks/`에 복사하고, `~/.claude/settings.json`에 등록합니다.
+
+### 1단계: 플러그인 경로 탐지
+
+4.2 절차와 동일하게 `installed_plugins.json`에서 forge-flow 설치 경로를 탐지합니다.
+
+### 2단계: 훅 스크립트 복사
+
+```bash
+mkdir -p ~/.claude/forge-flow-hooks/
+cp "${PLUGIN_DIR}/skills/setup-workflow/hooks/workflow-state.sh" ~/.claude/forge-flow-hooks/
+cp "${PLUGIN_DIR}/skills/setup-workflow/hooks/stop-guard.sh" ~/.claude/forge-flow-hooks/
+cp "${PLUGIN_DIR}/skills/setup-workflow/hooks/dangerous-cmd-guard.sh" ~/.claude/forge-flow-hooks/
+chmod +x ~/.claude/forge-flow-hooks/*.sh
+```
+
+### 3단계: 글로벌 settings.json 훅 등록
+
+`~/.claude/settings.json`에 hooks 블록을 등록합니다. 기존 내용이 있으면 hooks 블록만 병합합니다.
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{
+      "matcher": "",
+      "hooks": [{"type": "command", "command": "bash ~/.claude/forge-flow-hooks/workflow-state.sh"}]
+    }],
+    "Stop": [{
+      "matcher": "",
+      "hooks": [{"type": "command", "command": "bash ~/.claude/forge-flow-hooks/stop-guard.sh"}]
+    }],
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{"type": "command", "command": "bash ~/.claude/forge-flow-hooks/dangerous-cmd-guard.sh"}]
+    }]
+  }
+}
+```
+
+### 4단계: 환경변수 확인
+
+`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 환경변수가 설정되어 있는지 확인하고, 미설정 시 설정 안내를 표시합니다.
+
+### 5단계: 결과 보고
+
+```
+forge-flow v3.4.0 글로벌 훅 설치 완료
+
+[글로벌 훅]
+  ✅ ~/.claude/forge-flow-hooks/workflow-state.sh
+  ✅ ~/.claude/forge-flow-hooks/stop-guard.sh
+  ✅ ~/.claude/forge-flow-hooks/dangerous-cmd-guard.sh
+  ✅ ~/.claude/settings.json hooks 등록 완료
+
+[다음 단계]
+  각 프로젝트에서 /forge-flow:setup-workflow 실행 (훅 등록 없이 CLAUDE.md + .forge-flow/ 만 설정)
+```
+
+---
+
+## --global --update 흐름
+
+1. 플러그인 경로 재탐지 (--global 1단계와 동일)
+2. `~/.claude/forge-flow-hooks/*.sh` 덮어쓰기 (최신 스크립트로 교체)
+3. 글로벌 settings.json hooks 경로 확인 (이미 `~/.claude/forge-flow-hooks/`면 변경 없음)
+4. 결과 보고: "글로벌 훅 스크립트 갱신 완료"
 
 ---
 
@@ -605,15 +649,15 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 [변경 예정 항목] (CHANGELOG.md 기반)
   {CHANGELOG에서 해당 버전 범위의 변경 항목을 나열}
 
-[훅 등록 경로]
-  ✅ hooks 절대 경로 — {HOOKS_DIR}/ (최신 플러그인 경로)
+[훅 정리]
+  🗑️ 프로젝트별 hooks 블록 제거 (settings.local.json / settings.json)
   🗑️ 기존 .claude/hooks/*.sh — 정리됨 (해당 시)
+  ✅ 글로벌 훅 확인 (~/.claude/forge-flow-hooks/)
 
 [변경하지 않는 항목]
   ⏭️ 빌드 명령 — 프로젝트 커스텀 (보존)
   ⏭️ 변경 전파 체인 — 프로젝트 커스텀 (보존)
   ⏭️ 브랜치 전략 — 프로젝트 커스텀 (보존)
-  ⏭️ 에이전트팀 설정 — 프로젝트 커스텀 (보존)
   ⏭️ 프로젝트 고유 섹션 — 보존
 
 적용할까요? [Y/n]
@@ -623,31 +667,29 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 
 사용자 동의 후 실행:
 
-1. **플러그인 경로 재탐지** (4.2 절차):
-   - `installed_plugins.json`에서 최신 `installPath` 탐지
-   - 훅 스크립트 존재 확인
-2. **hooks 등록 경로 갱신**:
-   - `settings.local.json`의 hooks 명령을 **최신 플러그인 절대 경로**로 교체
-   - 기존 상대 경로(`bash .claude/hooks/...`) → 절대 경로(`bash {HOOKS_DIR}/...`)
-   - 기존 절대 경로도 최신 경로로 교체
-   - [에이전트팀] `.claude/settings.json`도 동일하게 갱신
-3. **기존 훅 스크립트 정리** (4.7 마이그레이션):
-   - 프로젝트에 복사되어 있던 `.claude/hooks/*.sh` 삭제
-   - 서브프로젝트의 `.claude/hooks/*.sh`도 삭제 (모노레포)
+1. **플러그인 경로 재탐지** (4.2 절차)
+2. **프로젝트별 훅 등록 정리** (글로벌로 이전):
+   - `settings.local.json`에서 forge-flow hooks 블록 제거 (있으면)
+   - `.claude/settings.json` (프로젝트)에서 forge-flow hooks 블록 제거 (있으면)
+   - 기존 `.claude/hooks/*.sh` 파일 삭제 (v3.0.0~v3.1.x 레거시)
    - git 추적에서 제거
+3. **글로벌 훅 확인**: `~/.claude/forge-flow-hooks/` 미설치 시 → "--global을 실행하세요" 안내
 4. **CLAUDE.md 버전 마커 갱신**: `<!-- forge-flow:version=X.X.X -->`를 plugin.json의 `requires_update` 값으로 교체
 5. **CLAUDE.md 템플릿 섹션 갱신** (해당 시):
    - `<!-- SECTION: 작업 원칙 -->` — 템플릿 기준으로 교체
    - `<!-- SECTION: 워크플로 -->` — 템플릿 기준으로 교체
+   - `<!-- SECTION: 에이전트팀 (선택) -->` → `<!-- SECTION: 에이전트팀 -->` 으로 마커 교체 + 내용 갱신
+   - 에이전트팀 섹션이 없으면 → 새로 추가 (v3.4.0 필수)
 
 ### 4단계: 결과 보고
 
 ```
 [update 완료] v{이전버전} → v{최신버전}
 
-[훅 등록]
-  ✅ hooks 절대 경로 갱신 — {HOOKS_DIR}/
+[훅 정리]
+  🗑️ 프로젝트별 hooks 블록 제거됨
   🗑️ 기존 .claude/hooks/*.sh 정리됨 (해당 시)
+  ✅ 글로벌 훅 확인 — ~/.claude/forge-flow-hooks/
   ✅ CLAUDE.md 버전 마커 — {최신버전}
 
 ⏭️ 프로젝트 설정 — 보존됨
@@ -659,14 +701,14 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 - 버전 마커
 - `<!-- SECTION: 작업 원칙 -->` 섹션
 - `<!-- SECTION: 워크플로 -->` 섹션
-- `settings.local.json` / `settings.json` hooks 명령 경로 (절대 경로 갱신)
+- `settings.local.json` / `settings.json` (프로젝트) hooks 블록 제거 (글로벌 이전)
+- `<!-- SECTION: 에이전트팀 -->` 섹션 (필수화)
 - 프로젝트에 복사된 기존 `.claude/hooks/*.sh` 삭제 (마이그레이션)
 
 **update가 절대 건드리지 않는 것**:
 - `<!-- SECTION: 빌드 명령 -->` — 프로젝트 커스텀
 - `<!-- SECTION: 변경 전파 체인 -->` — 프로젝트 커스텀
 - `<!-- SECTION: 브랜치 전략 -->` — 프로젝트 커스텀
-- `<!-- SECTION: 에이전트팀 -->` — 프로젝트 커스텀
 - SECTION 마커 없는 프로젝트 고유 섹션 (MCP 원칙, 기술 스택 등)
 
 미정이었던 항목(빌드/테스트 명령) 재수집도 이 옵션으로 처리.
@@ -699,3 +741,11 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
    - 기존 .claude/hooks/*.sh 삭제 (있으면, 마이그레이션 잔여)
 3. .forge-flow/design/ 보존 여부 확인 (사용자 데이터)
 ```
+
+### --purge --global 추가 옵션
+
+`--purge --global` 실행 시 프로젝트 제거에 더해:
+- `~/.claude/forge-flow-hooks/` 디렉토리 삭제
+- `~/.claude/settings.json`에서 forge-flow hooks 블록 제거
+
+> 주의: 다른 프로젝트에서 forge-flow를 사용 중이면 해당 프로젝트의 훅도 비활성화됩니다.

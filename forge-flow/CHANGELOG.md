@@ -1,5 +1,31 @@
 # forge-flow Changelog
 
+## v3.4.0
+
+- **feat**: 하네스 원칙 적용 — 모든 평가 단계를 외부 에이전트팀으로 전환
+  - 원칙: 생산자 ≠ 평가자 (자기 평가 전면 금지)
+  - S규모 review-req: 메인 세션 자기 검수 → 에이전트팀 1명 외부 검수
+  - review-plan (M/L): 메인 세션 자기 검수 → 에이전트팀 외부 검수 (M:1명, L:2명)
+  - S규모 verify: 기본 검증 강도 0→1 (에이전트팀 1명 필수)
+  - L규모 자가 체크포인트 → 에이전트팀 1명 중간 검수
+  - 검증 강도 0(경량) 제거 — 최소 강도 1 (외부 검수 필수)
+- **feat**: 평가자 캘리브레이션 — rework-log 반복 패턴(×2+)을 verify/test 평가자 프롬프트에 주입
+- **feat**: 글로벌 훅 아키텍처 — 프로젝트별 훅 등록 → 글로벌 1회 등록
+  - `--global` 명령 추가: `~/.claude/forge-flow-hooks/`에 스크립트 복사 + `~/.claude/settings.json` 등록
+  - 모든 훅 스크립트에 `.forge-flow/` 프로젝트 가드 추가 (미설치 프로젝트 무영향)
+  - 프로젝트별 setup에서 훅 등록 제거 (CLAUDE.md + .forge-flow/ 만)
+  - 다중 프로젝트 관리: 글로벌 1번 업데이트로 전 프로젝트 적용
+- **change**: 에이전트팀 필수화 — 서브에이전트 폴백 경로 전면 제거
+  - review-req, verify, test, plan 4개 스킬의 서브에이전트 폴백 섹션 삭제
+  - CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 체크 분기 삭제
+  - setup-workflow 에이전트팀 선택 제거 (무조건 활성화)
+- **change**: CLAUDE.md 에이전트팀 섹션 필수화 (선택→필수)
+- **change**: --update 시 프로젝트별 훅 등록 자동 정리 (글로벌로 이전)
+  - v3.0.0~v3.1.5: .claude/hooks/*.sh 삭제
+  - v3.1.6~v3.3.3: settings.local.json + settings.json hooks 블록 제거
+- **affected**: workflow-state.sh, stop-guard.sh, dangerous-cmd-guard.sh, review-req, review-plan, verify, test, plan, clarify SKILL.md, setup-workflow SKILL.md + 템플릿, plugin.json, marketplace.json, CLAUDE.md
+- **requires_update**: 3.4.0 (훅 아키텍처 변경 + CLAUDE.md 에이전트팀 필수화)
+
 ## v3.3.3
 
 - **fix**: 에이전트팀 spawn을 실제 도구 기반으로 정확히 기술

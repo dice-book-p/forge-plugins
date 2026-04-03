@@ -63,20 +63,17 @@
 - 특정 브랜치 지정 없으면 → 기준 브랜치에서 기능 브랜치 분기
 - plan 단계에서 자동 분기: `{BRANCH_PATTERN}{작업명}`
 
-<!-- SECTION: 에이전트팀 (선택) -->
-{AGENT_TEAMS_SECTION}
-
-<!-- 에이전트팀 활성화 시 {AGENT_TEAMS_SECTION}에 삽입할 내용:
-
+<!-- SECTION: 에이전트팀 -->
 ## 에이전트팀
 
-활성화 상태 (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+필수 활성화 (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
 
 ### 동적 팀 구성
 
 팀은 매 작업마다 **동적으로** 구성됩니다. 사전 고정 역할은 없습니다.
 
 - **구현 팀** (plan에서 구성): 독립 모듈/레이어별 구현자 + 리뷰어
+- **설계 검증 팀** (review-plan에서 구성): 구현 가능성 + AC 커버리지 검증자
 - **검증 팀** (verify에서 구성): 관점별 검증자 (AC, 패턴)
 - **테스트 팀** (test에서 구성): UI/UX 브라우저 테스트 + API 테스트 (sonnet 고정)
 
@@ -87,14 +84,13 @@
 
 ### 리더 역할
 - clarify ~ plan: 리더 단독
+- review-plan: 검증 팀 spawn + 결과 취합 + 최종 판정
 - 구현: 팀원 spawn + 모니터링 + 통합 머지
 - verify: 검증 팀 spawn + 결과 취합 + 최종 판정
 
 ### 모델 사용 전략
 | 작업 유형 | 모델 | 이유 |
 |-----------|------|------|
-| 분석/검증/플랜 (review-req, verify) | 세션 모델 상속 | 사용자가 선택한 모델 수준 유지 |
+| 분석/검증/플랜 (review-req, review-plan, verify) | 세션 모델 상속 | 사용자가 선택한 모델 수준 유지 |
 | 구현/문서작성 (implementer, reviewer) | sonnet 고정 | 명확한 지시 기반 실행, 속도+비용 최적 |
 | 실행 테스트 (test 테스터) | sonnet 고정 | 브라우저/API 테스트는 지시 실행 중심, 비용 최적 |
-
--->

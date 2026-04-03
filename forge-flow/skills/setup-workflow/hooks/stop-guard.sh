@@ -9,6 +9,9 @@
 INPUT=$(cat)
 SESSION_ID="${CLAUDE_SESSION_ID}"
 
+# forge-flow 미설치 프로젝트에서는 즉시 종료 (글로벌 훅 안전 가드)
+[ -d ".forge-flow" ] || exit 0
+
 # 에이전트팀 팀원은 리더가 생명주기 관리 → 즉시 통과
 GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null)
 if [ -n "$GIT_COMMON_DIR" ] && [ "$GIT_COMMON_DIR" != ".git" ] && [ ! -d ".forge-flow" ]; then

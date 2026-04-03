@@ -7,6 +7,9 @@
 
 INPUT=$(cat)
 
+# forge-flow 미설치 프로젝트에서는 즉시 종료 (글로벌 훅 안전 가드)
+[ -d ".forge-flow" ] || exit 0
+
 # jq 또는 python3 폴백
 if command -v jq >/dev/null 2>&1; then
   TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
