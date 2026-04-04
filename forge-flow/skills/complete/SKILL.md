@@ -82,21 +82,52 @@ header: "design 문서"
 options:
   - label: "삭제 (Recommended)"
     description: "design 문서를 삭제합니다. 작업 내용은 커밋에 반영되어 있습니다"
-  - label: "보관"
-    description: ".forge-flow/archive/ 에 이동하여 보관합니다"
+  - label: "유지"
+    description: "design 문서를 그대로 유지합니다 (다음 clarify에서 참조 가능)"
 multiSelect: false
 ```
 
-- "삭제" → design 파일 삭제
-- "보관" → `.forge-flow/archive/` 디렉토리로 이동 (없으면 생성)
+- "삭제" → design 파일 + `{task_id}.review.md` 삭제
+- "유지" → design 파일 그대로 유지 (다음 clarify에서 orphan으로 감지됨)
 
-### 4단계: Rework 교훈 기록 (조건부)
+### 4단계: Rework 교훈 기록 + 프로세스 회고 (조건부)
 
-design 문서의 `## 검수 이력`에 REWORK 이력이 있는 경우에만 실행합니다. REWORK이 없었으면 이 단계를 스킵합니다.
+#### 4-A. Rework 교훈 기록
 
-REWORK 이력에서 교훈을 추출하여 `.forge-flow/rework-log.md`에 기록합니다 (verify SKILL.md의 "Rework Log 관리" 규칙에 따름).
+`.forge-flow/design/{task_id}.review.md`에 REWORK 이력이 있는 경우에만 실행합니다. REWORK이 없었으면 이 하위 단계를 스킵합니다.
+
+REWORK 이력에서 교훈을 추출하여 `.forge-flow/rework-log.md`에 기록합니다 (verify SKILL.md의 "Rework Log 관리" 규칙에 따름, 차원 태그 `[코드]` 기본 부여).
 
 > verify/test REWORK 시점에 이미 기록된 항목이면 중복 기록하지 않습니다.
+
+#### 4-B. 프로세스 회고
+
+이번 워크플로에서 프로세스 차원의 반복 이슈가 있었는지 자가 점검합니다. **전체 차원**의 rework-log를 읽고 아래를 확인:
+
+1. **평가자 오판**: verify/test 숙의에서 검증자 간 불일치가 있었고, 한쪽 판단이 틀렸다면 → `[평가]` 태그로 rework-log에 기록
+2. **프로세스 비효율**: 에이전트팀 구성, 검증 강도, 스킵 판단 등에서 비효율이 있었다면 → `[프로세스]` 태그로 기록
+3. **요구사항 해석**: clarify에서 모호하게 작성된 AC가 verify/test까지 전파되었다면 → `[요구사항]` 태그로 기록
+4. **환경/도구 제약**: test에서 환경 의존적 이슈가 발생했다면 → `[환경]` 태그로 기록
+
+> 이번 워크플로에서 해당 사항이 없으면 이 하위 단계를 스킵합니다.
+
+#### 4-C. rework-log 예외 처리
+
+design 문서에 `## rework-log 예외` 섹션이 있는 경우 (plan 충돌 체크에서 예외를 명시한 경우), 해당 항목에 대해 사용자에게 확인합니다:
+
+**AskUserQuestion 호출** (예외 항목이 있을 때만):
+```
+question: "이번 작업에서 rework-log 예외를 적용했습니다. 해당 규칙을 영구 변경할까요?"
+header: "rework-log 예외"
+options:
+  - label: "유지 (변경 없음)"
+    description: "rework-log 항목을 그대로 유지합니다. 이번만 예외"
+  - label: "수정"
+    description: "rework-log 항목을 이번 예외에 맞게 수정합니다"
+  - label: "삭제"
+    description: "해당 rework-log 항목을 삭제합니다 (더 이상 유효하지 않음)"
+multiSelect: false
+```
 
 ### 5단계: 정리 + 완료 보고
 
@@ -107,6 +138,6 @@ REWORK 이력에서 교훈을 추출하여 `.forge-flow/rework-log.md`에 기록
 [작업 완료]
   작업: {task_id}
   커밋: {커밋 해시} 또는 "스킵"
-  design: {삭제 / archive 보관}
+  design: {삭제 / 유지}
   워크플로 파일 정리 완료
 ```

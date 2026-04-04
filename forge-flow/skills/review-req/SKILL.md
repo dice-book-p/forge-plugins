@@ -241,13 +241,16 @@ multiSelect: false
 
 ### 4단계: 결과 기록
 
-design 문서의 `## 검수 결과`, `## 검수 이력` 섹션에 기록:
+design 문서의 `## 검수 결과` 섹션에 요약 기록, 상세 이력은 `.forge-flow/design/{task_id}.review.md`에 기록:
 
+**design 문서** (`## 검수 결과`):
 ```markdown
 ## 검수 결과
 - review-req: PASS (2026-03-13)
+```
 
-## 검수 이력
+**{task_id}.review.md** (상세 이력 — 누적):
+```markdown
 ### review-req
 - #1 CONCERNS: AC-3 "응답시간 500ms 이내" → 측정 기준 모호
   → 수용: "p95 기준 500ms"로 구체화

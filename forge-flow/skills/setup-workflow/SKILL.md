@@ -680,6 +680,17 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
    - `<!-- SECTION: 워크플로 -->` — 템플릿 기준으로 교체
    - `<!-- SECTION: 에이전트팀 (선택) -->` → `<!-- SECTION: 에이전트팀 -->` 으로 마커 교체 + 내용 갱신
    - 에이전트팀 섹션이 없으면 → 새로 추가 (v3.4.0 필수)
+6. **rework-log 마이그레이션** (v3.4.1):
+   - `.forge-flow/rework-log.md` 존재 시 각 항목을 스캔
+   - 차원 태그(`[코드]`, `[평가]` 등)가 없는 항목에만 `[코드]` 태그 자동 부여
+   - 기존 태그가 있는 항목은 그대로 유지
+7. **검수 이력 분리 마이그레이션** (v3.4.1):
+   - `.forge-flow/design/` 내 design 파일 스캔
+   - **진행 중 작업 제외**: `.forge-flow/state/`에 해당 task_id의 상태 파일이 존재하고 phase가 `"completed"`가 아니면 스킵
+   - 대상 design 파일에서 `## 검수 이력` 섹션을 `{task_id}.review.md`로 추출
+   - 원본 design 파일에서 `## 검수 이력` 섹션 제거
+8. **archive 정리** (v3.4.1):
+   - `.forge-flow/archive/` 디렉토리 존재 시 삭제
 
 ### 4단계: 결과 보고
 
@@ -691,6 +702,11 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
   🗑️ 기존 .claude/hooks/*.sh 정리됨 (해당 시)
   ✅ 글로벌 훅 확인 — ~/.claude/forge-flow-hooks/
   ✅ CLAUDE.md 버전 마커 — {최신버전}
+
+[v3.4.1 마이그레이션]
+  ✅ rework-log 차원 태그 — {N}건 [코드] 태그 부여 (해당 시)
+  ✅ 검수 이력 분리 — {N}개 design → .review.md 분리 (해당 시)
+  🗑️ archive 디렉토리 — 정리됨 (해당 시)
 
 ⏭️ 프로젝트 설정 — 보존됨
 ```
@@ -704,6 +720,9 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 - `settings.local.json` / `settings.json` (프로젝트) hooks 블록 제거 (글로벌 이전)
 - `<!-- SECTION: 에이전트팀 -->` 섹션 (필수화)
 - 프로젝트에 복사된 기존 `.claude/hooks/*.sh` 삭제 (마이그레이션)
+- `.forge-flow/rework-log.md` 차원 태그 마이그레이션 (v3.4.1)
+- `.forge-flow/design/` 검수 이력 분리 마이그레이션 (v3.4.1)
+- `.forge-flow/archive/` 삭제 (v3.4.1)
 
 **update가 절대 건드리지 않는 것**:
 - `<!-- SECTION: 빌드 명령 -->` — 프로젝트 커스텀

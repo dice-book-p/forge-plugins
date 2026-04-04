@@ -8,7 +8,7 @@ description: "구현 착수 전 요구사항을 명확한 스펙으로 변환합
 ## 프로젝트 업데이트 확인
 
 CLAUDE.md의 `<!-- forge-flow:version=X.X.X -->` 마커를 확인합니다.
-마커 버전이 **`3.4.0`** 미만이면 아래 안내를 표시한 뒤 **정상 진행**합니다 (차단하지 않음):
+마커 버전이 **`3.4.1`** 미만이면 아래 안내를 표시한 뒤 **정상 진행**합니다 (차단하지 않음):
 
 ```
 ⚠️ forge-flow 프로젝트 설정 업데이트가 필요합니다.
@@ -61,7 +61,7 @@ multiSelect: false
   - 기타 → 해당 phase에 맞는 스킬 호출 안내
 - "추가 요구사항 반영" → 기존 design 파일이 존재하면 로드하여 수정. design 파일이 없으면 (clarify 도중 중단된 경우) 새로 작성. phase를 `"clarifying"`으로 되돌리고 1단계부터 진행 (기존 AC 유지 + 추가분 반영)
   - **주의**: phase가 `"implementing"` 이후였다면 경고 표시: "이미 구현된 코드가 있습니다. 추가 요구사항 반영 시 기존 구현과 충돌할 수 있습니다. `git diff`로 현재 변경 사항을 확인하세요."
-- "새 작업 시작" → 이전 상태 파일의 design을 `.forge-flow/archive/`로 이동. 이전 상태 파일 삭제. 새 작업으로 진행
+- "새 작업 시작" → 이전 상태 파일의 design 파일 + `.review.md` 삭제. 이전 상태 파일 삭제. 새 작업으로 진행
 
 **B. 다른 세션의 미완료 작업 존재** (현재 세션 바인딩 없음)
 
@@ -91,17 +91,17 @@ options:
   - label: "{design_name} — 기반으로 추가/보완 작업"
     description: "이 design을 기반으로 새 워크플로를 시작합니다"
   ...추가 파일이 있으면 각각 선택지로...
-  - label: "새 작업 시작 (orphan 보관)"
-    description: "orphan 파일을 archive로 이동하고 새 작업을 시작합니다"
+  - label: "새 작업 시작 (orphan 삭제)"
+    description: "orphan 파일을 삭제하고 새 작업을 시작합니다"
 multiSelect: false
 ```
 
 - 기존 design 선택 → 새 상태 파일 생성 (task_id = design 파일명, phase = "clarifying") → 기존 design 기반으로 1단계 진행 (추가/수정할 부분 질문)
-- "새 작업 시작" → orphan을 `.forge-flow/archive/`로 이동 → 새 작업으로 진행
+- "새 작업 시작" → orphan design 파일 + `.review.md` 삭제 → 새 작업으로 진행
 
 **D. 기존 작업 없음** → 새 작업 생성 (아래 실행 흐름으로 직행)
 
-> archive 디렉토리의 design 파일은 참고용으로만 안내합니다. "이전에 관련 작업이 있었습니다: {archive_file}" — 별도 선택지 없음.
+> 삭제된 design 파일은 git 히스토리에서 복원 가능합니다.
 
 ## 실행 흐름
 
@@ -109,7 +109,7 @@ multiSelect: false
 
 1. 사용자 프롬프트에서 모호한 부분, 누락된 정보 식별
 2. CLAUDE.md 읽기 — 프로젝트 설정, 빌드 명령, 기존 패턴 파악
-3. **rework-log 참조**: `.forge-flow/rework-log.md` 존재 시 스캔하여 이번 작업과 관련된 과거 REWORK 패턴이 있는지 확인. 관련 패턴 발견 시 AC 또는 주의사항에 반영
+3. **rework-log 참조**: `.forge-flow/rework-log.md` 존재 시 `[코드]`, `[요구사항]` 차원의 항목을 스캔하여 이번 작업과 관련된 과거 REWORK 패턴이 있는지 확인. 관련 패턴 발견 시 AC 또는 주의사항에 반영
 4. 영향 범위 사전 조사 — 관련 파일/모듈 개략 파악
    - LSP 사용 가능 시 → 참조 검색, 타입 확인
    - LSP 없으면 → grep + Glob으로 폴백
@@ -262,11 +262,10 @@ multiSelect: false
 (plan에서 작성)
 
 ## 검수 결과
-(review-req, review-plan, verify에서 기입)
-
-## 검수 이력
-(각 검수 단계에서 기입)
+(review-req, review-plan, verify, test에서 기입)
 ```
+
+> 검수 상세 이력은 `.forge-flow/design/{task_id}.review.md`에 별도 기록됩니다 (design 파일 비대화 방지).
 
 ### AC 작성 가이드
 

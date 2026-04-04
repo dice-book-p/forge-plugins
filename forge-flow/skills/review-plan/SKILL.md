@@ -149,13 +149,16 @@ multiSelect: false
 
 ### 4단계: 결과 기록
 
-design 문서의 `## 검수 결과`, `## 검수 이력` 섹션에 기록:
+design 문서의 `## 검수 결과` 섹션에 요약 기록, 상세 이력은 `.forge-flow/design/{task_id}.review.md`에 기록:
 
+**design 문서** (`## 검수 결과`):
 ```markdown
 ## 검수 결과
 - review-plan: PASS (2026-03-13)
+```
 
-## 검수 이력
+**{task_id}.review.md** (상세 이력 — 누적):
+```markdown
 ### review-plan
 - #1 REWORK: AC-2에 대응하는 구현 파일 누락
   → 수용: UserService.java 추가

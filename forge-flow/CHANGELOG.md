@@ -1,5 +1,23 @@
 # forge-flow Changelog
 
+## v3.4.1
+
+- **feat**: rework-log 차원 태그 도입 — `[코드]`, `[평가]`, `[프로세스]`, `[요구사항]`, `[환경]`
+  - 각 스킬이 필요한 차원만 태그 기반 필터링하여 읽음
+  - plan에서 rework-log 충돌 체크 — 이번 구현과 모순되는 항목 감지 시 design에 예외 명시
+  - complete에서 프로세스 회고 — 프로세스 차원 기록 + 예외 영구 변경 확인
+- **feat**: design 파일 검수 이력 분리 — `{task_id}.review.md`
+  - design에는 `## 검수 결과`(요약)만 유지, 상세 이력은 별도 파일로 누적
+  - verify/test 검증자 프롬프트에서 필요 섹션만 발췌 주입 (토큰 절약)
+- **change**: rework-log 관리 규칙 변경 — 15건 상한, ×1은 60일 TTL
+  - 삭제 우선순위: 카운트 최저 → 동일 시 오래된 날짜 순
+- **change**: archive 제거 — design 삭제로 변경, git 히스토리에서 복원 가능
+- **fix**: --update 마이그레이션 추가
+  - 기존 rework-log 항목에 `[코드]` 태그 자동 부여
+  - 기존 design 검수 이력 → .review.md 분리
+  - .forge-flow/archive/ 삭제
+- **affected**: clarify, plan, verify, test, complete, review-req, review-plan, setup-workflow, templates
+
 ## v3.4.0
 
 - **feat**: 하네스 원칙 적용 — 모든 평가 단계를 외부 에이전트팀으로 전환
