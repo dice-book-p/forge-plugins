@@ -1,5 +1,22 @@
 # forge-flow Changelog
 
+## v3.4.2
+
+- **feat**: 검증자/테스터 응답 형식을 구조화 체크리스트 테이블로 변경
+  - 자유 텍스트 → "검증 항목별 체크리스트 테이블 + 근거" 형식
+  - verify/test: AC별 체크리스트, review-req/review-plan: 메타 품질 항목별 체크리스트
+  - AC 누락 방지 + 숙의 시 항목별 비교 용이
+- **feat**: rework-log ×2+ 패턴을 검증자 체크리스트의 정식 검사 항목으로 승격
+  - [rework] 접두사 항목으로 체크리스트에 포함, 판정 필수
+  - "참고하세요" → "체크리스트에 넣고 판정하세요"로 강제성 확보
+- **feat**: 숙의(Deliberation) 판정 우선순위 4단계 명시
+  - 구체적 증거(최우선) → AC 원문 기준 → 패턴 일관성 → 판정 불가 시 CONCERNS로 사용자 위임
+  - 4개 평가 스킬(verify, test, review-req, review-plan) 모두 동일 체계 적용
+- **feat**: verify 검증자 프롬프트를 역할별로 분리
+  - 검증자-AC: 요구사항 + AC + 검증방법 중심 design 발췌
+  - 검증자-패턴: 요구사항 + 따를 기존 패턴 + 변경 대상 파일 중심 design 발췌
+- **affected**: verify, test, review-req, review-plan SKILL.md
+
 ## v3.4.1
 
 - **feat**: rework-log 차원 태그 도입 — `[코드]`, `[평가]`, `[프로세스]`, `[요구사항]`, `[환경]`

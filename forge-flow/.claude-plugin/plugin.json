@@ -1,6 +1,6 @@
 {
   "name": "forge-flow",
-  "version": "3.4.1",
+  "version": "3.4.2",
   "requires_update": "3.4.1",
   "description": "Claude Code 워크플로 자동화 — clarify → review-req → plan → review-plan(조건부) → implement → verify → test 사이클로 완성도 높은 개발 경험",
   "skills": "./skills/"
