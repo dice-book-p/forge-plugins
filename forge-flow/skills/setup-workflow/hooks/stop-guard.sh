@@ -57,7 +57,10 @@ fi
 PHASE=$(_json_read '.phase' "$STATE_FILE")
 
 # 3. 이미 검수 완료면 → 즉시 통과
-if [ "$PHASE" = "verified" ] || [ "$PHASE" = "tested" ] || [ "$PHASE" = "completing" ] || [ "$PHASE" = "completed" ]; then
+# 설계 의도: verify/test PASS 이후(verified, tested)와 마무리 중(completing, completed)만 통과 허용.
+# awaiting_manual_result: 사용자가 직접 테스트 실행 후 돌아와야 하므로 세션 종료 허용.
+# clarifying~implementing 등 워크플로 진행 중인 모든 단계는 차단하여 미완료 종료 방지.
+if [ "$PHASE" = "verified" ] || [ "$PHASE" = "tested" ] || [ "$PHASE" = "completing" ] || [ "$PHASE" = "completed" ] || [ "$PHASE" = "awaiting_manual_result" ]; then
   exit 0
 fi
 

@@ -13,7 +13,7 @@ test(실행 테스트) 통과 또는 스킵 후, 작업을 마무리합니다.
 2. phase가 `"tested"` 또는 `"verified"`인지 확인 → 아니면: "현재 `{phase}` 단계입니다. verify/test를 먼저 통과하세요."
 3. `design_file`이 존재하는 파일 경로인지 확인 → 없으면: "설계 문서를 찾을 수 없습니다."
 
-> `"verified"` phase는 test가 스킵된 경우 (S규모 + UI AC 없음)에 해당합니다.
+> `"verified"` phase는 test가 스킵된 경우 (S규모 + UI AC 없음, 또는 plan 4-C에서 스킵 선택)에 해당합니다.
 
 ## 상태 파일 갱신
 
@@ -32,6 +32,7 @@ test(실행 테스트) 통과 또는 스킵 후, 작업을 마무리합니다.
 2. **변경 파일 목록**: `git status`로 변경/신규/삭제 파일 파악
 3. **작업 요약**: design 문서의 요구사항 + AC 기반 한 줄 요약
 4. **커밋 메시지 초안**: design 문서 기반으로 작성 (conventional commit 형식)
+5. **테스트 스킵 사유** (phase가 `"verified"`인 경우): design 문서의 `## 검증 설정` 섹션에서 `테스트 스킵 사유` 항목을 읽어 표시. 항목이 없으면 "자동 스킵 조건 충족"으로 표시.
 
 ```
 [작업 완료 — 커밋 준비]
@@ -43,10 +44,14 @@ test(실행 테스트) 통과 또는 스킵 후, 작업을 마무리합니다.
   - src/auth/OldAuthHelper.java (삭제)
 
 작업 요약: {design 문서의 목적 한 줄}
+테스트: {완료 / 스킵 — {스킵 사유} / 수동 완료}
 
 커밋 메시지 초안:
   feat: {design 문서 기반 요약}
+  {test_skip_reason이 있으면: "test-skipped: {사유}" footer 추가}
 ```
+
+> 상태 파일에 `test_skip_reason`이 존재하면 커밋 메시지 footer에 `test-skipped: {사유}`를 자동 추가합니다.
 
 ### 2단계: 커밋 여부 확인
 
@@ -87,8 +92,8 @@ options:
 multiSelect: false
 ```
 
-- "삭제" → design 파일 + `{task_id}.review.md` 삭제
-- "유지" → design 파일 그대로 유지 (다음 clarify에서 orphan으로 감지됨)
+- "삭제" → design 파일 + `{task_id}.review.md` 삭제. 상태 파일에 `"keep_design": false` 기록
+- "유지" → design 파일 그대로 유지. 상태 파일에 `"keep_design": true` 기록 → 다음 세션의 workflow-state.sh가 design 파일을 보존함
 
 ### 4단계: Rework 교훈 기록 + 프로세스 회고 (조건부)
 

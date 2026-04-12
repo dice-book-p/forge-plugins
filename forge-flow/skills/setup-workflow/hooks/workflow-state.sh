@@ -26,7 +26,13 @@ else
   _json_read() {
     local key="${1#.}"
     key="${key%% //*}"
-    python3 -c "import json; d=json.load(open('$2')); print(d.get('$key',''))" 2>/dev/null
+    python3 -c "
+import json, functools
+d=json.load(open('$2'))
+keys='$key'.split('.')
+val=functools.reduce(lambda o,k: o.get(k,'') if isinstance(o,dict) else '', keys, d)
+print(val if val != '' else '')
+" 2>/dev/null
   }
 fi
 
@@ -63,14 +69,17 @@ with open('$NEW_SF','w') as f: json.dump(d,f,ensure_ascii=False)
 fi
 
 # 1. 상태 파일 정리
-# - completed 상태: 즉시 삭제 (+ 연결된 design 파일도 삭제)
+# - completed 상태: 즉시 삭제 (+ 연결된 design 파일은 keep_design 필드에 따라 처리)
 if ls .forge-flow/state/*.json 1>/dev/null 2>&1; then
   for sf in .forge-flow/state/*.json; do
     [ -f "$sf" ] || continue
     SF_PHASE=$(_json_read '.phase' "$sf")
     if [ "$SF_PHASE" = "completed" ]; then
-      SF_DESIGN=$(_json_read '.design_file' "$sf")
-      [ -n "$SF_DESIGN" ] && [ -f "$SF_DESIGN" ] && rm -f "$SF_DESIGN"
+      SF_KEEP=$(_json_read '.keep_design' "$sf")
+      if [ "$SF_KEEP" != "true" ]; then
+        SF_DESIGN=$(_json_read '.design_file' "$sf")
+        [ -n "$SF_DESIGN" ] && [ -f "$SF_DESIGN" ] && rm -f "$SF_DESIGN"
+      fi
       rm -f "$sf"
     fi
   done
@@ -106,16 +115,34 @@ if [ -n "$BOUND_STATE" ]; then
       echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 명확화 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 사용자와의 대화 맥락이 아직 design 문서에 확정되지 않았습니다.\"}" ;;
     reviewing-req)
       echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 검수 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
+    req-reviewed)
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 검수 완료. /forge-flow:plan으로 구현 계획을 수립하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 plan 전 /compact를 권장합니다.\"}" ;;
     planning)
       echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 설계 중. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 plan 완료 후 /compact를 권장합니다.\"}" ;;
     reviewing-plan)
       echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 설계 검수 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
     implementing)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 구현 중 (규모: $SCALE). design 문서의 '따를 기존 패턴' 섹션을 반드시 참조하여 기존 코드 패턴과 일관되게 구현하세요. 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 시작 전이라면 /compact 권장. 구현 중간에는 피하세요.\"}" ;;
+      VERIFY_RW=$(_json_read '.rework_counts.verify' "$BOUND_STATE")
+      TEST_RW=$(_json_read '.rework_counts.test' "$BOUND_STATE")
+      [ -z "$VERIFY_RW" ] && VERIFY_RW=0
+      [ -z "$TEST_RW" ] && TEST_RW=0
+      TOTAL_RW=$((VERIFY_RW + TEST_RW))
+      if [ "$TOTAL_RW" -gt 0 ] 2>/dev/null; then
+        RW_DETAIL=""
+        [ "$VERIFY_RW" -gt 0 ] 2>/dev/null && RW_DETAIL="verify:${VERIFY_RW}"
+        [ "$TEST_RW" -gt 0 ] 2>/dev/null && { [ -n "$RW_DETAIL" ] && RW_DETAIL="${RW_DETAIL}, "; RW_DETAIL="${RW_DETAIL}test:${TEST_RW}"; }
+        echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 구현 중 (규모: $SCALE, REWORK ${RW_DETAIL}). debug-gate 루트코즈 가설 기반으로 수정하세요. design 문서의 '따를 기존 패턴' 참조. 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 중간에는 /compact를 피하세요.\"}"
+      else
+        echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 구현 중 (규모: $SCALE). design 문서의 '따를 기존 패턴' 섹션을 반드시 참조하여 기존 코드 패턴과 일관되게 구현하세요. 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 시작 전이라면 /compact 권장. 구현 중간에는 피하세요.\"}"
+      fi ;;
     verifying)
       echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 검수 진행 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 결과 맥락이 손실될 수 있습니다.\"}" ;;
     verified)
       echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 검수 완료. /forge-flow:complete로 작업을 마무리하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 마무리해도 안전합니다.\"}" ;;
+    testing)
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 실행 테스트 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 테스트 결과 맥락이 손실될 수 있습니다.\"}" ;;
+    awaiting_manual_result)
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 수동 테스트 대기 중. 테스트를 직접 실행하고 결과를 입력하세요. 완료 시 /forge-flow:test 재호출. design: $DESIGN_FILE\"}" ;;
     tested)
       echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 테스트 완료. /forge-flow:complete로 작업을 마무리하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 마무리해도 안전합니다.\"}" ;;
     completing)

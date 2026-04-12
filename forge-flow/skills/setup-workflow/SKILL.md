@@ -228,9 +228,9 @@ mkdir -p .forge-flow/state/    # 세션별 상태 파일
 
 ### 훅 스크립트 레퍼런스
 
-아래 3개 스크립트는 플러그인 설치 경로(`skills/setup-workflow/hooks/`)에 위치하며, `--global` 실행 시 `~/.claude/forge-flow-hooks/`로 복사됩니다.
+아래 3개 스크립트는 플러그인 설치 경로(`skills/setup-workflow/hooks/`)에 위치합니다. `--global` 실행 시 `~/.claude/forge-flow-hooks/`에는 **래퍼 스크립트**가 생성되며, 래퍼가 런타임에 플러그인 경로를 동적 탐색하여 아래 스크립트를 실행합니다.
 
-> 이 섹션은 훅 스크립트의 내용을 문서화한 **레퍼런스**입니다. 실제 실행되는 스크립트는 플러그인 설치 경로의 파일입니다.
+> 이 섹션은 훅 스크립트의 내용을 문서화한 **레퍼런스**입니다. 실제 실행되는 스크립트는 플러그인 설치 경로의 파일이며, 플러그인 업데이트 시 자동으로 최신 버전이 사용됩니다.
 
 > 아래 스크립트 내용은 플러그인 설치 경로의 파일과 동일한 **레퍼런스**입니다. 프로젝트에 복사하거나 Write하지 않습니다.
 
@@ -512,7 +512,7 @@ git rm -f --cached .claude/hooks/*.sh 2>/dev/null
 |----------|---------|
 | CLAUDE.md 마커 | `forge-flow:version=X.X.X` 존재 확인 (루트) |
 | CLAUDE.md 워크플로 섹션 | `/forge-flow:clarify`, `/forge-flow:verify` 등 스킬명 포함 |
-| 글로벌 hooks | `~/.claude/settings.json` hooks 키 존재 + `~/.claude/forge-flow-hooks/` 경로 등록 확인 |
+| 글로벌 hooks | `~/.claude/settings.json` hooks 키 존재 + `~/.claude/forge-flow-hooks/` 래퍼 스크립트 존재 + `_resolve_plugin_dir` 함수 포함 확인 |
 | design 디렉토리 | `{루트}/.forge-flow/design/` 존재 |
 | .forge-flow 디렉토리 | `{루트}/.forge-flow/` 존재 |
 | 기존 훅 정리 | `{루트}/.claude/hooks/*.sh`가 **존재하지 않는지** 확인 (마이그레이션 완료) |
@@ -553,21 +553,49 @@ forge-flow v3.4.0 설치 완료
 
 ## --global 흐름
 
-글로벌 훅을 설치합니다. 모든 프로젝트에서 공유하는 훅 스크립트를 `~/.claude/forge-flow-hooks/`에 복사하고, `~/.claude/settings.json`에 등록합니다.
+글로벌 훅을 설치합니다. `~/.claude/forge-flow-hooks/`에 **래퍼 스크립트**를 생성하고, `~/.claude/settings.json`에 등록합니다. 래퍼는 런타임에 플러그인 설치 경로를 동적 탐색하므로, 플러그인 업데이트 시 수동 갱신이 필요 없습니다.
 
-### 1단계: 플러그인 경로 탐지
+### 1단계: 플러그인 경로 탐지 + 검증
 
-4.2 절차와 동일하게 `installed_plugins.json`에서 forge-flow 설치 경로를 탐지합니다.
+4.2 절차와 동일하게 `installed_plugins.json`에서 forge-flow 설치 경로를 탐지합니다. 이 단계는 **설치 시점 검증용**이며, 실제 훅 실행 시에는 래퍼가 동적으로 경로를 탐색합니다.
 
-### 2단계: 훅 스크립트 복사
+### 2단계: 래퍼 스크립트 생성
+
+래퍼 스크립트는 `installed_plugins.json`에서 플러그인 경로를 런타임에 탐색하여 실제 훅 스크립트에 위임합니다. 버전이 포함된 경로를 하드코딩하지 않으므로 플러그인 업데이트 후에도 자동으로 최신 버전을 사용합니다.
 
 ```bash
 mkdir -p ~/.claude/forge-flow-hooks/
-cp "${PLUGIN_DIR}/skills/setup-workflow/hooks/workflow-state.sh" ~/.claude/forge-flow-hooks/
-cp "${PLUGIN_DIR}/skills/setup-workflow/hooks/stop-guard.sh" ~/.claude/forge-flow-hooks/
-cp "${PLUGIN_DIR}/skills/setup-workflow/hooks/dangerous-cmd-guard.sh" ~/.claude/forge-flow-hooks/
+```
+
+아래 래퍼 템플릿으로 3개 스크립트를 생성합니다. `{HOOK_NAME}` 부분만 각각 `workflow-state`, `stop-guard`, `dangerous-cmd-guard`로 치환:
+
+```bash
+#!/bin/bash
+# forge-flow hook wrapper — 플러그인 경로 동적 탐색
+# 플러그인 업데이트 시 수동 갱신 불필요
+_resolve_plugin_dir() {
+  local f="$HOME/.claude/plugins/installed_plugins.json"
+  [ -f "$f" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -r 'if .version==2 then .plugins["forge-flow@forge-plugins"][0].installPath else .["forge-flow@forge-plugins"].installPath end' "$f" 2>/dev/null
+  else
+    python3 -c "
+import json,os
+d=json.load(open(os.path.expanduser('~/.claude/plugins/installed_plugins.json')))
+e=d.get('plugins',{}).get('forge-flow@forge-plugins',[{}]) if d.get('version')==2 else [d.get('forge-flow@forge-plugins',{})]
+print(e[0].get('installPath','') if e else '')" 2>/dev/null
+  fi
+}
+PLUGIN_DIR=$(_resolve_plugin_dir)
+HOOK="${PLUGIN_DIR}/skills/setup-workflow/hooks/{HOOK_NAME}.sh"
+[ -n "$PLUGIN_DIR" ] && [ -f "$HOOK" ] && exec bash "$HOOK" || exit 0
+```
+
+```bash
 chmod +x ~/.claude/forge-flow-hooks/*.sh
 ```
+
+> **설계 원칙**: 래퍼는 경로 탐색 + 위임만 수행. 비즈니스 로직은 플러그인 내부 `hooks/` 디렉토리의 실제 스크립트에만 존재. `installed_plugins.json` 파싱은 ~10ms로 체감 불가.
 
 ### 3단계: 글로벌 settings.json 훅 등록
 
@@ -599,13 +627,15 @@ chmod +x ~/.claude/forge-flow-hooks/*.sh
 ### 5단계: 결과 보고
 
 ```
-forge-flow v3.4.0 글로벌 훅 설치 완료
+forge-flow 글로벌 훅 설치 완료
 
-[글로벌 훅]
-  ✅ ~/.claude/forge-flow-hooks/workflow-state.sh
-  ✅ ~/.claude/forge-flow-hooks/stop-guard.sh
-  ✅ ~/.claude/forge-flow-hooks/dangerous-cmd-guard.sh
+[글로벌 훅 — 래퍼 방식]
+  ✅ ~/.claude/forge-flow-hooks/workflow-state.sh  (래퍼 → 플러그인 동적 탐색)
+  ✅ ~/.claude/forge-flow-hooks/stop-guard.sh      (래퍼 → 플러그인 동적 탐색)
+  ✅ ~/.claude/forge-flow-hooks/dangerous-cmd-guard.sh (래퍼 → 플러그인 동적 탐색)
   ✅ ~/.claude/settings.json hooks 등록 완료
+
+  플러그인 업데이트 시 자동으로 최신 훅 사용 (수동 갱신 불필요)
 
 [다음 단계]
   각 프로젝트에서 /forge-flow:setup-workflow 실행 (훅 등록 없이 CLAUDE.md + .forge-flow/ 만 설정)
@@ -615,10 +645,19 @@ forge-flow v3.4.0 글로벌 훅 설치 완료
 
 ## --global --update 흐름
 
-1. 플러그인 경로 재탐지 (--global 1단계와 동일)
-2. `~/.claude/forge-flow-hooks/*.sh` 덮어쓰기 (최신 스크립트로 교체)
-3. 글로벌 settings.json hooks 경로 확인 (이미 `~/.claude/forge-flow-hooks/`면 변경 없음)
-4. 결과 보고: "글로벌 훅 스크립트 갱신 완료"
+래퍼 방식 도입 이후, 플러그인 업데이트 시 `--global --update`는 **일반적으로 불필요**합니다. 래퍼가 런타임에 최신 플러그인 경로를 자동 탐색하기 때문입니다.
+
+이 명령은 아래 경우에만 필요합니다:
+- **기존 복사본 → 래퍼 마이그레이션**: v3.4.2 이하에서 설치한 글로벌 훅(실제 스크립트 복사본)을 래퍼로 전환
+- **래퍼 형식 자체 변경**: 래퍼 템플릿 구조가 변경된 경우 (극히 드뭄)
+
+### 실행 흐름
+
+1. **래퍼 여부 감지**: `~/.claude/forge-flow-hooks/workflow-state.sh` 첫 줄에 `_resolve_plugin_dir` 함수가 있으면 래퍼, 없으면 기존 복사본
+2. **기존 복사본인 경우** → --global 2단계(래퍼 생성)를 재실행하여 래퍼로 교체
+3. **이미 래퍼인 경우** → 래퍼 템플릿이 최신인지 확인, 필요 시 갱신
+4. 글로벌 settings.json hooks 경로 확인 (이미 `~/.claude/forge-flow-hooks/`면 변경 없음)
+5. 결과 보고: "글로벌 훅 래퍼 확인/갱신 완료"
 
 ---
 
@@ -671,9 +710,10 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 2. **프로젝트별 훅 등록 정리** (글로벌로 이전):
    - `settings.local.json`에서 forge-flow hooks 블록 제거 (있으면)
    - `.claude/settings.json` (프로젝트)에서 forge-flow hooks 블록 제거 (있으면)
+   - **하드코딩된 플러그인 캐시 경로** (`plugins/cache/forge-plugins/forge-flow/{버전}/...`) 참조가 있으면 반드시 제거
    - 기존 `.claude/hooks/*.sh` 파일 삭제 (v3.0.0~v3.1.x 레거시)
    - git 추적에서 제거
-3. **글로벌 훅 확인**: `~/.claude/forge-flow-hooks/` 미설치 시 → "--global을 실행하세요" 안내
+3. **글로벌 훅 확인**: `~/.claude/forge-flow-hooks/` 미설치 시 → "--global을 실행하세요" 안내. 설치되어 있지만 래퍼가 아닌 복사본이면 → "--global --update로 래퍼로 전환하세요" 안내
 4. **CLAUDE.md 버전 마커 갱신**: `<!-- forge-flow:version=X.X.X -->`를 plugin.json의 `requires_update` 값으로 교체
 5. **CLAUDE.md 템플릿 섹션 갱신** (해당 시):
    - `<!-- SECTION: 작업 원칙 -->` — 템플릿 기준으로 교체
@@ -691,6 +731,9 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
    - 원본 design 파일에서 `## 검수 이력` 섹션 제거
 8. **archive 정리** (v3.4.1):
    - `.forge-flow/archive/` 디렉토리 존재 시 삭제
+9. **프로젝트 검증 관점 섹션 추가** (v3.4.3):
+   - CLAUDE.md `<!-- SECTION: 에이전트팀 -->` 내에 `### 프로젝트 검증 관점 (선택)` 섹션이 없으면 빈 테이블로 자동 추가
+   - 이미 존재하면 스킵 (사용자 커스텀 보존)
 
 ### 4단계: 결과 보고
 
@@ -723,11 +766,13 @@ update를 실행하기 전, 변경될 내용을 사용자에게 **먼저 보고*
 - `.forge-flow/rework-log.md` 차원 태그 마이그레이션 (v3.4.1)
 - `.forge-flow/design/` 검수 이력 분리 마이그레이션 (v3.4.1)
 - `.forge-flow/archive/` 삭제 (v3.4.1)
+- `### 프로젝트 검증 관점` 빈 테이블 추가 (v3.4.3, 미존재 시에만)
 
 **update가 절대 건드리지 않는 것**:
 - `<!-- SECTION: 빌드 명령 -->` — 프로젝트 커스텀
 - `<!-- SECTION: 변경 전파 체인 -->` — 프로젝트 커스텀
 - `<!-- SECTION: 브랜치 전략 -->` — 프로젝트 커스텀
+- `### 프로젝트 검증 관점` 테이블 내용 — 프로젝트 커스텀 (존재하면 보존)
 - SECTION 마커 없는 프로젝트 고유 섹션 (MCP 원칙, 기술 스택 등)
 
 미정이었던 항목(빌드/테스트 명령) 재수집도 이 옵션으로 처리.

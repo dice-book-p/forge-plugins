@@ -1,5 +1,37 @@
 # forge-flow Changelog
 
+## v3.4.5
+
+- **feat**: clarify/complete/hooks에 테스트 스킵 사유 + awaiting_manual_result 연동
+  - clarify: design 파일 포맷의 `## 검증 설정`에 테스트 스킵 사유 항목 포함
+  - plan 4-C: 스킵 선택 시 `## 검증 설정`에 `테스트 스킵 사유` 기록, 수동/혼합 시 `awaiting_manual_result` phase 사용 명시
+  - complete: phase `"verified"` 진입 시 테스트 스킵 사유를 완료 보고에 표시, 커밋 메시지 footer에 `test-skipped` 자동 추가
+  - test: 선행 조건에 `awaiting_manual_result` phase 재진입 허용 추가
+  - workflow-state.sh: `testing`, `awaiting_manual_result` phase 상태 안내 추가
+  - stop-guard.sh: `awaiting_manual_result` phase 종료 허용 (수동 테스트 후 복귀 필요)
+- **affected**: clarify, plan, complete, test SKILL.md, workflow-state.sh, stop-guard.sh
+
+## v3.4.4
+
+- **feat**: verify 수렴 검증 N회 반복 + 상태 파일 카운터 체계 강화
+  - `convergence_round` 상태 파일에 추적 — REWORK 시 0 리셋, PASS 시 최종 라운드 번호 유지
+  - `rework_counts.verify_lifetime` 추가 — 아키텍처 재검토 리셋 후에도 누적 (≥6시 경고)
+  - S 규모: 검증자 1명 고정, TeamCreate 없이 Agent 직접 spawn으로 명시
+  - 검증 설정(강도·수렴 상한) plan에서 1회 결정 후 verify 재진입 시 재확인 없음을 명시
+- **affected**: verify SKILL.md
+
+## v3.4.3
+
+- **feat**: plan 4단계를 4-A/4-B/4-C 3개 소단계로 확장
+  - 4-A: 검증 강도 설정 (기존 유지)
+  - 4-B: 수렴 상한 설정 — S규모 제외, 기본값 M=1 L=2, AskUserQuestion으로 사용자 선택
+  - 4-C: 테스트 방식 자동 판정 — AC 분석 기반, design `## 검증 강도`에 기록
+- **feat**: verify/test 수렴 검증을 수렴 상한(M)만큼 반복하는 구조로 변경
+  - 0건 시 조기 종료, 상한 소진 후에도 최종 PASS
+  - 각 라운드 팀 전체 교체, 이전 라운드 결과 전달 금지
+- **feat**: test 스킵 조건에 plan 4-C 판정(`테스트 방식: 스킵`) 우선 참조 추가
+- **affected**: plan, verify, test SKILL.md
+
 ## v3.4.2
 
 - **feat**: 검증자/테스터 응답 형식을 구조화 체크리스트 테이블로 변경
