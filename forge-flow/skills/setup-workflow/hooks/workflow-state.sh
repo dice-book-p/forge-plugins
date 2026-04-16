@@ -6,6 +6,8 @@
 # stdin: (사용자 프롬프트 정보)
 # stdout: { "additionalContext": "..." }
 
+trap '' PIPE  # Claude Code가 파이프를 일찍 닫아도 SIGPIPE로 비정상 종료 방지
+
 INPUT=$(cat)
 SESSION_ID="${CLAUDE_SESSION_ID}"
 

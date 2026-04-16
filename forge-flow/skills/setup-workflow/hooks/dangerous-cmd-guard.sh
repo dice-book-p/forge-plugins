@@ -5,6 +5,8 @@
 # stdin: { "tool_name": "Bash", "tool_input": { "command": "..." } }
 # stdout: { "permissionDecision": "deny", "reason": "..." } 또는 빈 출력(허용)
 
+trap '' PIPE  # Claude Code가 파이프를 일찍 닫아도 SIGPIPE로 비정상 종료 방지
+
 INPUT=$(cat)
 
 # forge-flow 미설치 프로젝트에서는 즉시 종료 (글로벌 훅 안전 가드)

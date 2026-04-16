@@ -1,5 +1,12 @@
 # forge-flow Changelog
 
+## v3.4.6
+
+- **fix**: 모든 훅 스크립트에 `trap '' PIPE` 추가 — SIGPIPE 비정상 종료 방지
+  - Claude Code가 stdin 파이프를 일찍 닫을 때 stdout 쓰기에서 Broken pipe 발생하던 문제 해결
+  - additionalContext 주입 누락 현상 방지
+- **affected**: workflow-state.sh, stop-guard.sh, dangerous-cmd-guard.sh
+
 ## v3.4.5
 
 - **feat**: clarify/complete/hooks에 테스트 스킵 사유 + awaiting_manual_result 연동
