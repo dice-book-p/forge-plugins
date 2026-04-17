@@ -108,21 +108,28 @@ if [ -n "$BOUND_STATE" ]; then
   DESIGN_FILE=$(_json_read '.design_file' "$BOUND_STATE")
   SCALE=$(_json_read '.scale' "$BOUND_STATE")
   TASK_ID=$(_json_read '.task_id' "$BOUND_STATE")
+  WORK_DIR=$(_json_read '.work_dir' "$BOUND_STATE")
   [ -z "$DESIGN_FILE" ] && DESIGN_FILE="없음"
   [ -z "$SCALE" ] && SCALE="미정"
   [ -z "$TASK_ID" ] && TASK_ID="(알 수 없음)"
 
+  # work_dir 컨텍스트 조립 (work_dir가 있고 null/빈문자열이 아닐 때만)
+  WORK_DIR_CTX=""
+  if [ -n "$WORK_DIR" ] && [ "$WORK_DIR" != "null" ]; then
+    WORK_DIR_CTX=" [WORKTREE] 작업 디렉토리: ${WORK_DIR}. 파일 읽기/수정은 ${WORK_DIR}/ 경로 사용. git 명령: git -C ${WORK_DIR}."
+  fi
+
   case "$PHASE" in
     clarifying)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 명확화 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 사용자와의 대화 맥락이 아직 design 문서에 확정되지 않았습니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 명확화 중.${WORK_DIR_CTX} design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 사용자와의 대화 맥락이 아직 design 문서에 확정되지 않았습니다.\"}" ;;
     reviewing-req)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 검수 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 검수 중.${WORK_DIR_CTX} design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
     req-reviewed)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 검수 완료. /forge-flow:plan으로 구현 계획을 수립하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 plan 전 /compact를 권장합니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 요구사항 검수 완료.${WORK_DIR_CTX} /forge-flow:plan으로 구현 계획을 수립하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 plan 전 /compact를 권장합니다.\"}" ;;
     planning)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 설계 중. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 plan 완료 후 /compact를 권장합니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 설계 중.${WORK_DIR_CTX} design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 plan 완료 후 /compact를 권장합니다.\"}" ;;
     reviewing-plan)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 설계 검수 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 설계 검수 중.${WORK_DIR_CTX} design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 피드백 반영 맥락이 손실될 수 있습니다.\"}" ;;
     implementing)
       VERIFY_RW=$(_json_read '.rework_counts.verify' "$BOUND_STATE")
       TEST_RW=$(_json_read '.rework_counts.test' "$BOUND_STATE")
@@ -133,22 +140,22 @@ if [ -n "$BOUND_STATE" ]; then
         RW_DETAIL=""
         [ "$VERIFY_RW" -gt 0 ] 2>/dev/null && RW_DETAIL="verify:${VERIFY_RW}"
         [ "$TEST_RW" -gt 0 ] 2>/dev/null && { [ -n "$RW_DETAIL" ] && RW_DETAIL="${RW_DETAIL}, "; RW_DETAIL="${RW_DETAIL}test:${TEST_RW}"; }
-        echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 구현 중 (규모: $SCALE, REWORK ${RW_DETAIL}). debug-gate 루트코즈 가설 기반으로 수정하세요. design 문서의 '따를 기존 패턴' 참조. 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 중간에는 /compact를 피하세요.\"}"
+        echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 구현 중 (규모: $SCALE, REWORK ${RW_DETAIL}).${WORK_DIR_CTX} debug-gate 루트코즈 가설 기반으로 수정하세요. design 문서의 '따를 기존 패턴' 참조. 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 중간에는 /compact를 피하세요.\"}"
       else
-        echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 구현 중 (규모: $SCALE). design 문서의 '따를 기존 패턴' 섹션을 반드시 참조하여 기존 코드 패턴과 일관되게 구현하세요. 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 시작 전이라면 /compact 권장. 구현 중간에는 피하세요.\"}"
+        echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 구현 중 (규모: $SCALE).${WORK_DIR_CTX} design 문서의 '따를 기존 패턴' 섹션을 반드시 참조하여 기존 코드 패턴과 일관되게 구현하세요. 완료 시 /forge-flow:verify 필수. design: $DESIGN_FILE [COMPACT] 구현 시작 전이라면 /compact 권장. 구현 중간에는 피하세요.\"}"
       fi ;;
     verifying)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 검수 진행 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 결과 맥락이 손실될 수 있습니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 검수 진행 중.${WORK_DIR_CTX} design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 검수 결과 맥락이 손실될 수 있습니다.\"}" ;;
     verified)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 검수 완료. /forge-flow:complete로 작업을 마무리하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 마무리해도 안전합니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 검수 완료.${WORK_DIR_CTX} /forge-flow:complete로 작업을 마무리하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 마무리해도 안전합니다.\"}" ;;
     testing)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 실행 테스트 중. design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 테스트 결과 맥락이 손실될 수 있습니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 실행 테스트 중.${WORK_DIR_CTX} design: $DESIGN_FILE [COMPACT] 현재 단계에서는 /compact를 피하세요 — 테스트 결과 맥락이 손실될 수 있습니다.\"}" ;;
     awaiting_manual_result)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 수동 테스트 대기 중. 테스트를 직접 실행하고 결과를 입력하세요. 완료 시 /forge-flow:test 재호출. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 수동 테스트 대기 중.${WORK_DIR_CTX} 테스트를 직접 실행하고 결과를 입력하세요. 완료 시 /forge-flow:test 재호출. design: $DESIGN_FILE\"}" ;;
     tested)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 테스트 완료. /forge-flow:complete로 작업을 마무리하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 마무리해도 안전합니다.\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 테스트 완료.${WORK_DIR_CTX} /forge-flow:complete로 작업을 마무리하세요. design: $DESIGN_FILE [COMPACT] 컨텍스트가 길어졌다면 /compact 후 마무리해도 안전합니다.\"}" ;;
     completing)
-      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 작업 마무리 중. design: $DESIGN_FILE\"}" ;;
+      echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 작업 마무리 중.${WORK_DIR_CTX} design: $DESIGN_FILE\"}" ;;
     completed)
       echo "{\"additionalContext\": \"[WORKFLOW:${TASK_ID}] 작업 완료.\"}" ;;
     *)

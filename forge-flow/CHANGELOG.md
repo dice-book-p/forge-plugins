@@ -1,5 +1,14 @@
 # forge-flow Changelog
 
+## v3.4.7
+
+- **feat**: git worktree 기반 작업 격리 지원
+  - clarify: "1-B단계: 작업 위치 선택" 추가 — 현재 디렉토리 / 새 워크트리 / 기존 워크트리 선택
+  - complete: "1.5단계: 워크트리 처리" 추가 — merge / PR / 유지 / 폐기 선택
+  - workflow-state.sh: state의 work_dir 읽어 [WORKTREE] 컨텍스트 주입
+  - state 스키마: work_dir, base_branch 필드 추가 (null 기본값, 하위호환)
+- **affected**: clarify/SKILL.md, complete/SKILL.md, workflow-state.sh, plugin.json
+
 ## v3.4.6
 
 - **fix**: 모든 훅 스크립트에 `trap '' PIPE` 추가 — SIGPIPE 비정상 종료 방지

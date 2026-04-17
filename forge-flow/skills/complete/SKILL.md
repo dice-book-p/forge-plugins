@@ -53,7 +53,57 @@ test(실행 테스트) 통과 또는 스킵 후, 작업을 마무리합니다.
 
 > 상태 파일에 `test_skip_reason`이 존재하면 커밋 메시지 footer에 `test-skipped: {사유}`를 자동 추가합니다.
 
+### 1.5단계: 워크트리 처리 (조��부)
+
+상태 파일의 `work_dir` 필��가 존재하고 `null`이 아닌 경우에만 실행합니다. `work_dir`가 없으면 이 단계를 스킵하고 2단계로 진행합니다.
+
+> 워크트리 작업 시 git 명령은 모두 `git -C {work_dir}`로 실행합니다.
+
+**AskUserQuestion 호출**:
+```
+question: "워크트리 작업입니다. 어떻게 처리할까요?"
+header: "워크트리"
+options:
+  - label: "base branch로 merge (Recommended)"
+    description: "{base_branch} 브랜치로 merge한 뒤 워크트리를 삭제합니다"
+  - label: "PR 생성"
+    description: "브랜치를 push하고 PR을 생성합니다. 워크트리는 유지됩니다"
+  - label: "유지"
+    description: "워크트리와 브랜치를 그대로 유지합니다 (다음 세션에서 재개 가능)"
+  - label: "폐기"
+    description: "워크트리와 브랜치를 삭제합니다"
+multiSelect: false
+```
+
+- **"merge"** 선택 시:
+  1. 워크트리의 변경 사항이 모두 커밋되었는지 확인 (미커밋 시 2단계에서 먼저 커밋)
+  2. 원본 repo에서 base branch 체크아웃: `git -C {repo_root} checkout {base_branch}`
+  3. 워크트리 브랜치를 merge: `git -C {repo_root} merge {worktree_branch}`
+  4. merge 성공 확인 후 워크트리 삭제: `git -C {repo_root} worktree remove {work_dir_path}`
+  5. state에서 `work_dir`, `base_branch` 필드를 `null`로 갱신
+  > 주의: 워크트리는 단일 브랜치에 고정되어 있으므로, merge는 반드시 원본 repo({repo_root})에서 실행합니다.
+
+- **"PR 생성"** 선택 시:
+  1. `git -C {work_dir} push -u origin {worktree_branch}`
+  2. `gh pr create` (base: `{base_branch}`)
+  3. 워크트리 유지 — state의 `work_dir` 보존
+
+- **"유지"** 선택 시:
+  1. 워크트리 유지 — state의 `work_dir` 보존하여 다음 세션에서 재개 가능
+
+- **"폐기"** 선택 시:
+  1. 사용자에게 재확인: "워크트리의 ���든 미커밋 변경이 삭제됩니다. 계속하시겠습니까?"
+  2. 확인 후 워크트리 삭제: `git -C {repo_root} worktree remove --force {work_dir_path}`
+  3. state에서 `work_dir`, `base_branch` 필드를 `null`로 갱신
+
+> `{repo_root}`: `git -C {work_dir} rev-parse --show-toplevel`로 ��지합니다.
+> `{worktree_branch}`: `git -C {work_dir} branch --show-current`로 감지합니다.
+> `{base_branch}`: 상태 파일의 `base_branch` 필드에서 읽습니다.
+
 ### 2단계: 커밋 여부 확인
+
+> 워크트리 작업에서 "merge" 또는 "폐기"를 선택한 경우, 이미 워크트리가 삭제되었으므로 2단계의 git 명령은 원본 repo에서 실행합니다.
+> 워크트리가 유지된 경우 (PR/유지), 2단계의 git 명령은 `git -C {work_dir}`로 실행합니다.
 
 **AskUserQuestion 호출**:
 ```
