@@ -1,6 +1,6 @@
 # forge-flow Changelog
 
-## v3.5.0
+## v3.4.8
 
 - **feat**: clarify/plan에 "정보 수집 목적" 탐색 에이전트팀(Explorer + Analyzer) 도입 — 메인 컨텍스트 오염(345K+ 토큰 케이스) 방지
   - clarify: `## 탐색 에이전트팀 (공통)` 섹션 신설 — 팀 구조, Spawn 절차, 프롬프트 템플릿, 단계별 요약 포맷 3종(개략/질문 중/상세), 폴백 정책 5종, state 값 확장
@@ -12,6 +12,7 @@
   - plan 1단계: M/L 규모 확정 시 팀 호출 + 인라인 요약(Explorer/Analyzer 역할·"plan 1단계 (상세)" 포맷) — 상세 프롬프트 템플릿은 clarify 공통 섹션 참조. S 규모 메인 직접 처리 유지. `rework_counts.plan > 0` 시 design 변경분 한해 재호출
   - review 계열 팀(교차검증 목적)과 탐색 팀(정보 수집 목적) 명확 구분
   - 폴백: TeamCreate 오류·spawn 실패·타임아웃(5분)·빈 리턴·부분 실패 5종 처리. 메인 직접 탐색 + 동일 포맷 유지 + state에 `"fallback"` 기록 + 자동 진행 (CLAUDE.md 2.5단계 사용자 확인과 별개 레이어)
+- **note**: v3.5.0으로 잘못 bump되었던 것을 v3.4.8로 정정 (워크플로 단계 변경 없이 기존 단계 내부 로직 추가이므로 patch)
 - **affected**: clarify/SKILL.md, plan/SKILL.md, plugin.json, marketplace.json
 
 ## v3.4.7
