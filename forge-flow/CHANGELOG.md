@@ -1,5 +1,19 @@
 # forge-flow Changelog
 
+## v3.5.0
+
+- **feat**: clarify/plan에 "정보 수집 목적" 탐색 에이전트팀(Explorer + Analyzer) 도입 — 메인 컨텍스트 오염(345K+ 토큰 케이스) 방지
+  - clarify: `## 탐색 에이전트팀 (공통)` 섹션 신설 — 팀 구조, Spawn 절차, 프롬프트 템플릿, 단계별 요약 포맷 3종(개략/질문 중/상세), 폴백 정책 5종, state 값 확장
+  - clarify 1단계: M/L 후보 판단 게이트 3기준(키워드/규모/명시) 추가, 해당 시 팀 호출 — S 규모는 메인 직접 처리
+  - clarify 2단계: "부분 수정/다시 설명" 응답 시 M/L 후보 재판정 → 팀 재호출
+  - clarify 3단계: 추가 codebase 조사 필요 시 팀 위임, 사용자 범위 확장 시 재판정
+  - clarify 4단계: 범위 확장 재판정 + S 확정 시 이후 팀 미호출 명시
+  - clarify Task Discovery "추가 요구사항 반영": verify FAIL 후 재실행 시 기존 탐색 결과 재사용 (design 영향 범위 변경 시에만 재호출)
+  - plan 1단계: M/L 규모 확정 시 팀 호출 + 인라인 요약(Explorer/Analyzer 역할·"plan 1단계 (상세)" 포맷) — 상세 프롬프트 템플릿은 clarify 공통 섹션 참조. S 규모 메인 직접 처리 유지. `rework_counts.plan > 0` 시 design 변경분 한해 재호출
+  - review 계열 팀(교차검증 목적)과 탐색 팀(정보 수집 목적) 명확 구분
+  - 폴백: TeamCreate 오류·spawn 실패·타임아웃(5분)·빈 리턴·부분 실패 5종 처리. 메인 직접 탐색 + 동일 포맷 유지 + state에 `"fallback"` 기록 + 자동 진행 (CLAUDE.md 2.5단계 사용자 확인과 별개 레이어)
+- **affected**: clarify/SKILL.md, plan/SKILL.md, plugin.json, marketplace.json
+
 ## v3.4.7
 
 - **feat**: git worktree 기반 작업 격리 지원
