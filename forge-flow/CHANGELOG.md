@@ -1,6 +1,6 @@
 # forge-flow Changelog
 
-## v3.5.0
+## v3.4.10
 
 - **feat**: work unit 단위검증 게이트 도입 — implement 단계 끝물 회귀 디버깅 비용 감소
   - clarify design 포맷에 `### work units` 섹션 정의(필드 6종: id/제목/대상AC/변경대상/검증방식/의존). 마커가 없으면 단위검증 자동 비활성화(하위 호환).
