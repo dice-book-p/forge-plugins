@@ -1,5 +1,17 @@
 # forge-flow Changelog
 
+## v3.5.0
+
+- **feat**: work unit 단위검증 게이트 도입 — implement 단계 끝물 회귀 디버깅 비용 감소
+  - clarify design 포맷에 `### work units` 섹션 정의(필드 6종: id/제목/대상AC/변경대상/검증방식/의존). 마커가 없으면 단위검증 자동 비활성화(하위 호환).
+  - plan에 `### 3-B단계: work unit 분해 + 검증방식·의존 그래프 자동 제안` 신설. AC를 1차 기준으로 분해, 빌드 명령·변경 대상 기반으로 검증방식(단위테스트/수동/스킵+사유) 자동 제안. 의존 그래프는 탐색 팀 호출 체인을 근거로 도출하며 순환 참조는 즉시 사용자 보고 후 재분해 제안. AskUserQuestion 일괄 승인.
+  - 규모별 정책: S 비활성(기존 흐름) / M 권장(비활성화 가능) / L 필수.
+  - 구현자 프롬프트 + 단일 세션 흐름에 `## 단위검증 절차` 섹션 추가. 다음 unit 착수 직전 직전 unit 검증, FAIL 시 의존 후속 unit 차단(독립 unit은 계속). 상태는 in-memory 추적.
+  - verify 진입 게이트 4번 항목 추가: AC-10 마커 검사 선행, 미실행 unit 차단 또는 면제(사유 기재). 파싱 실패 시 false-positive 방지로 스킵.
+  - plan 중간 검수(task별 Spec / 50% 중간 검수)와 단위검증의 역할 분리 단락 추가(사후 외부 교차검증 vs 사전 자체 단위검증).
+  - CLAUDE.md/템플릿 워크플로 표 5번 행에 `(+ work unit 단위검증)` 표기, 규칙에 단위검증 항목 추가.
+- **affected**: `skills/clarify/SKILL.md`, `skills/plan/SKILL.md`, `skills/verify/SKILL.md`, `skills/setup-workflow/templates/claude-md-sections-v2.md`, `.claude-plugin/plugin.json`, `../.claude-plugin/marketplace.json`, `CHANGELOG.md`
+
 ## v3.4.9
 
 - **change**: 탐색 에이전트팀 호출 조건 단순화 — **규모 무관 항상 호출**

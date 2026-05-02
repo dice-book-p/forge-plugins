@@ -1,4 +1,4 @@
-<!-- forge-flow:version=3.4.1 -->
+<!-- forge-flow:version=3.5.0 -->
 <!-- SECTION: 작업 원칙 -->
 ## 작업 원칙
 
@@ -38,7 +38,7 @@
 | 2.5 | **사용자 확인** | review-req 통과 후 | S/M/L |
 | 3 | `/forge-flow:plan` | 사용자 승인 후 | S/M/L |
 | 4 | `/forge-flow:review-plan` | plan 완료 후 (조건부) | L 필수, M 조건부 |
-| 5 | 구현 | plan/review-plan 통과 후 | S/M/L |
+| 5 | 구현 (+ work unit 단위검증) | plan/review-plan 통과 후 | S/M/L |
 | 6 | `/forge-flow:verify` | 구현 완료 즉시 | S/M/L |
 | 7 | `/forge-flow:test` | verify 통과 후 | M/L (S 조건부) |
 | 8 | `/forge-flow:complete` | test 통과/스킵 후 | S/M/L |
@@ -48,6 +48,7 @@
 - `/forge-flow:verify` + `/forge-flow:test` 합격 없이 작업 완료 선언 금지
 - `.forge-flow/design/` 문서의 AC 항목을 모두 충족해야 작업 완료
 - review-req 통과 후 **사용자 확인** → plan → implement → verify까지 자동 진행 (위험 작업 제외)
+- **work unit 단위검증** (M/L 규모): plan이 design `### work units`에 분해한 단위마다 다음 unit 착수 직전 검증방식(단위테스트/수동/스킵)을 실행. FAIL이면 의존 후속 unit 차단(독립 unit은 계속). 끝물 회귀 디버깅 비용 감소가 목적이며, verify(코드 종합 검수)와 test(런타임 통합)와는 시점·주체·범위가 다르다. S 규모는 적용하지 않음.
 
 **상태 파일**: `.forge-flow/state/{task-id}.json` — 작업별 워크플로 단계 추적 (세션 간 재개 가능)
 
