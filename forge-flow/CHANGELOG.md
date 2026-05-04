@@ -1,5 +1,14 @@
 # forge-flow Changelog
 
+## v3.4.11
+
+- **feat**: Karpathy CLAUDE.md 원칙 3종 적용 — 외과적 변경 + 범위 절제 + 성공 기준 명시
+  - **verify / review-plan 검증자 프롬프트에 "외과적 변경 검증" 섹션 추가**: 초과 구현(gold-plating) / 인접 코드 침범 / 가정 위반 / 변경 라인 소급 불가 항목을 FAIL 판정 대상으로 명시. verify는 AC 충족 외 "넘친 것"도 검출.
+  - **review-plan 검증자에 "범위 절제 검증" 섹션 추가**: 제외 범위 침범·초과 설계·가정 반영 여부를 구현 계획 단계에서 사전 차단.
+  - **design 포맷에 `## 가정 (Assumptions)` 섹션 추가**: AC가 성립하기 위해 전제하는 조건을 명시. verify 검증자가 가정 위반 여부를 체크하는 앵커로 활용.
+  - **work unit 테이블에 `검증 기준` 열 추가**: 각 unit의 PASS 판단 조건을 구체적 명령 또는 관찰 조건으로 명시(Karpathy "Step → verify: [check]" 패턴). plan이 검증방식 자동 제안 시 검증 기준도 함께 도출.
+- **affected**: `skills/clarify/SKILL.md`, `skills/plan/SKILL.md`, `skills/verify/SKILL.md`, `skills/review-plan/SKILL.md`, `.claude-plugin/plugin.json`, `../.claude-plugin/marketplace.json`, `CHANGELOG.md`
+
 ## v3.4.10
 
 - **feat**: work unit 단위검증 게이트 도입 — implement 단계 끝물 회귀 디버깅 비용 감소
