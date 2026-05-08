@@ -1,5 +1,24 @@
 # forge-flow Changelog
 
+## v4.0.0
+
+- **feat (major)**: 플러그인 자체 완결 구조로 리아키텍처 — 사용자 업데이트 부담 제거 + TDD 워크플로 도입
+  - **훅 자체 등록**: 3개 훅(`workflow-state`/`stop-guard`/`dangerous-cmd-guard`)을 `hooks/hooks.json`으로 플러그인이 자체 등록. 사용자 `~/.claude/settings.json` 글로벌 패치 의존 제거.
+  - **CLAUDE.md 미패치**: 작업 원칙은 `clarify` SKILL.md 상단으로 흡수. 빌드 명령·브랜치 전략·변경 전파 체인은 `.forge-flow/config.json`(프로젝트별)으로 이전.
+  - **setup-workflow 스킬 폐지**: `clarify` 첫 실행이 `.forge-flow/`+`config.json` 부재를 자동 감지하여 부트스트랩.
+  - **TDD 통합**: `plan` 4단계에 TDD on/off 토글 추가. on이면 work unit 검증방식이 `단위테스트-TDD`로 자동 제안되며 RED-GREEN-REFACTOR 강제. 인프라 unit은 자동으로 `스킵(인프라 변경 — TDD 부적합)` 분류.
+  - **v3 → v4 마이그레이션 자동화**: `clarify` 첫 진입이 settings.json 글로벌 훅 + CLAUDE.md v3 패치 섹션 + v3 캐시(`3.x.x` 디렉토리)를 자동 감지·동의 후 정밀 정리. 백업 우선, 정밀 제거, 부분 실패 폴백 명시.
+  - **`requires_update` 메커니즘 폐지**: `plugin.json`에서 필드 제거. CLAUDE.md `<!-- forge-flow:version -->` 마커 폐지. 버저닝 체크리스트 7항목 → 3항목(plugin.json/marketplace.json/CHANGELOG)으로 축소.
+
+### Breaking Changes
+
+- **자동 트리거 비활성화**: `clarify` description에서 자연어 트리거어(`'추가'`/`'만들어'`/`'구현'` 등) 모두 제거. v3에서 `"X 만들어줘"` 같은 자연어로 자동 발동되던 워크플로가 v4부터는 `/forge-flow:clarify`를 사용자가 **직접 입력해야** 시작됩니다. 이후 단계(review-req → plan → ...)는 v3와 동일하게 자동 진행.
+- **setup-workflow 명령 제거**: `/forge-flow:setup-workflow --update`가 사라집니다. v4 마이그레이션은 `/forge-flow:clarify` 첫 실행 시 자동으로 트리거됩니다.
+- **CLAUDE.md 자동 정리**: 기존 v3 패치된 프로젝트 CLAUDE.md(`## 작업 원칙`/`## 워크플로`/`## 빌드 명령`/`## 변경 전파 체인`/`## 브랜치 전략`/`## forge-flow 플러그인 버저닝 체크리스트`)는 마이그레이션 동의 후 자동 제거됩니다(타임스탬프 백업 생성).
+- **글로벌 settings.json 자동 정리**: `~/.claude/settings.json`의 v3 forge-flow 훅 3종 항목이 마이그레이션 동의 후 자동 제거됩니다(타임스탬프 백업 생성). 다른 플러그인의 훅 및 사용자 설정은 보존됩니다.
+
+- **affected**: `claude-plugins/forge-flow/hooks/{hooks.json, *.sh 3종}` (신규), `claude-plugins/forge-flow/skills/setup-workflow/` (삭제), `skills/clarify/SKILL.md`, `skills/plan/SKILL.md`, `skills/verify/SKILL.md`, `skills/build-check/SKILL.md`, `skills/fe-check/SKILL.md`, `tests/v4/*.sh` (신규), `.claude-plugin/plugin.json`, `../.claude-plugin/marketplace.json`, `CLAUDE.md` (루트), `CHANGELOG.md`
+
 ## v3.4.11
 
 - **feat**: Karpathy CLAUDE.md 원칙 3종 적용 — 외과적 변경 + 범위 절제 + 성공 기준 명시

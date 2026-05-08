@@ -1,23 +1,106 @@
 ---
 name: clarify
-description: "구현 착수 전 요구사항을 명확한 스펙으로 변환합니다. 새 작업 요청, 기능 구현, 버그 수정, '추가', '수정', '만들어', '개선', '구현', '변경', '리팩토링' 등의 요청에 자동 활성화."
+description: "요구사항을 명확한 스펙으로 변환합니다. 사용자가 `/forge-flow:clarify`를 직접 호출하거나 워크플로 내부에서 호출될 때만 발동합니다. 워크플로 시작은 `/forge-flow:clarify` 직접 입력."
 ---
 
 구현 착수 전 요구사항을 명확한 스펙으로 변환하고 예비 규모를 판정합니다.
 
-## 프로젝트 업데이트 확인
+## 작업 원칙
 
-CLAUDE.md의 `<!-- forge-flow:version=X.X.X -->` 마커를 확인합니다.
-마커 버전이 **`3.4.10`** 미만이면 아래 안내를 표시한 뒤 **정상 진행**합니다 (차단하지 않음):
+**확신이 없으면 절대 진행하지 않습니다.** 질문 비용 < 재작업 비용.
+
+| 상황 | 조치 |
+|------|------|
+| 요구사항 해석 2가지+ | 구현 전 확인 |
+| 변경 범위 불명확 | 범위 먼저 합의 |
+| 구현 방식 선택 필요 | 옵션 제시 후 결정 |
+| 서비스 간 영향 불명확 | 영향도 먼저 파악 |
+| "혹시 이게 맞나?" 싶은 순간 | 즉시 멈추고 질문 |
+
+**구현 전 자가 체크** — 아래 중 하나라도 해당되면 구현 전에 질문:
+- 완료 후 어떻게 검증할지 지금 설명하기 어렵다
+- 변경이 영향을 미치는 범위를 아직 다 파악하지 못했다
+- 요구사항이 두 가지 이상으로 해석될 여지가 있다
+
+## 첫 실행 부트스트랩 (config.json 작성)
+
+진입 시 `.forge-flow/config.json` 부재 또는 `.forge-flow/` 디렉토리 부재를 감지하면 첫 실행으로 간주하고 부트스트랩을 진행합니다. 두 번째 실행부터는 본 섹션을 건너뜁니다.
+
+### 부재 감지 흐름
+
+1. `.forge-flow/` 디렉토리 부재 → `mkdir -p .forge-flow/{state,design}` 생성
+2. `.forge-flow/config.json` 부재 → AskUserQuestion으로 3필드 입력:
+   - `build_commands`: 빌드/타입체크/린트 명령. 단일 또는 객체(`{"default":"...", "fe":"...", "be":"..."}`). 미설정은 빈 객체 허용
+   - `branch_strategy`: `{"base_branch":"main", "feature_pattern":"feature/{name}"}` 형태
+   - `propagation_chain`: 변경 전파 표 또는 빈 객체. 예: `{"shared_types":["fe","be"]}`. 미설정 가능
+3. 사용자 답변을 `.forge-flow/config.json`으로 저장:
+
+```json
+{
+  "version": "1",
+  "build_commands": { ... },
+  "branch_strategy": { "base_branch": "...", "feature_pattern": "..." },
+  "propagation_chain": { ... }
+}
+```
+
+### 스키마 마이그레이션
+
+`config.json`이 존재하지만 `version` 필드가 현재 SKILL.md가 기대하는 버전 미만이면 사용자 동의 후 자동 변환. 변환 불가 시 수동 안내.
+
+### AskUserQuestion 예시
 
 ```
-⚠️ forge-flow 프로젝트 설정 업데이트가 필요합니다.
-   현재: v{마커 버전} → 최신: v{이 값 이상}
-   `/forge-flow:setup-workflow --update` 를 실행하세요.
-   (지금 작업은 정상 진행됩니다)
+question: "이 프로젝트에서 forge-flow를 처음 사용합니다. 빌드 명령을 어떻게 등록할까요?"
+header: "빌드 명령"
+options:
+  - label: "default 단일 명령"
+    description: "예: npm run build"
+  - label: "FE/BE 분리"
+    description: "build_commands.fe + build_commands.be 분리"
+  - label: "미설정 (Recommended)"
+    description: "빌드 명령 없이 진행 — 단위검증에서 단위테스트 비활성화"
+multiSelect: false
 ```
 
-> 마커가 없거나 버전이 같거나 높으면 이 섹션을 건너뜁니다.
+`branch_strategy`/`propagation_chain`도 동일 패턴으로 질문. 사용자가 `Other`로 직접 입력 가능. 모든 답변을 `.forge-flow/config.json`에 직렬화.
+
+## v3 → v4 마이그레이션
+
+진입 시 `~/.claude/forge-flow-migrated.v4` 마커 부재 + v3 잔재 감지 시 1회 마이그레이션 흐름을 트리거합니다. 마커 존재 시에도 잔재가 발견되면 부분 마이그레이션 안내 후 사용자 동의를 다시 받습니다.
+
+### v3 잔재 감지
+
+| # | 대상 | 감지 패턴 |
+|---|------|---------|
+| 1 | `~/.claude/settings.json` 글로벌 훅 | `grep -E 'forge-flow(-hooks)?/(workflow-state\|stop-guard\|dangerous-cmd-guard)\.sh'` 매칭 객체 1+건 |
+| 2 | 루트 `CLAUDE.md` v3 패치 섹션 | `grep '<!-- forge-flow:version=' CLAUDE.md` 또는 `grep '## forge-flow 플러그인 버저닝 체크리스트' CLAUDE.md` 1+건 |
+| 3 | `~/.claude/plugins/cache/forge-plugins/forge-flow/` v3 캐시 | `3.x.x` 패턴 디렉토리 1+개 |
+
+### 마이그레이션 흐름
+
+1. 감지된 잔재 목록을 사용자에게 표시 (각 대상의 항목 수, 백업 경로 미리보기 포함)
+2. AskUserQuestion 동의 받기 → "정리"/"수동 안내만"/"건너뛰기" 3-way
+3. "정리" 선택 시:
+   - **백업 우선** — 각 대상의 백업 파일 생성 (timestamp ms+random suffix)
+     - `~/.claude/settings.json.bak.{ms}-{rand}`
+     - `CLAUDE.md.bak.{ms}-{rand}` (프로젝트 루트, 글로벌 ~/.claude/CLAUDE.md는 미터치)
+     - 캐시는 백업 생략 (재설치 복원 가능)
+   - **정밀 제거** — 항목별:
+     - settings.json: 표준 JSON 파싱 → forge-flow 매칭 객체만 제거 → 재직렬화. **JSON 파싱 실패 시** 자동 편집 중단 + 백업 경로 + 수동 제거 안내 + 다음 대상으로 계속
+     - CLAUDE.md: forge-flow 의존 섹션 식별(SECTION 마커 또는 헤더 매칭) → 제거. **편집 실패 시** settings.json/캐시 정리는 계속 진행 + 실패 안내 출력
+     - 캐시: 디렉토리별 `rm -rf`. **권한 실패 시** 오류 메시지 + 수동 삭제 명령(`rm -rf ~/.claude/plugins/cache/forge-plugins/forge-flow/{버전}`) 안내 + 다음 디렉토리로 계속
+   - **마커 생성** — settings.json/CLAUDE.md/캐시 모두 잔재 0건일 때만 `~/.claude/forge-flow-migrated.v4` 마커 생성. 부분 완료 시 마커 미생성
+4. **마이그레이션 완료 안내(1회)**:
+   ```
+   ✅ forge-flow v4 마이그레이션 완료. 백업: {백업 경로 목록}
+   자동 트리거가 비활성화되었습니다. 앞으로 작업 시작 시 `/forge-flow:clarify`를 직접 입력하세요.
+   이후 단계(review-req → plan → ...)는 자동 진행됩니다.
+   ```
+
+### v4 캐시 보존
+
+캐시 정리는 `3.x.x` 디렉토리만 대상. `4.x.x` 이상 디렉토리는 보존(`grep -E '^[0-3]\.[0-9]+\.[0-9]+$'` 필터).
 
 ## 필수 게이트
 
@@ -36,6 +119,8 @@ CLAUDE.md의 `<!-- forge-flow:version=X.X.X -->` 마커를 확인합니다.
 
 실행 시 `.forge-flow/state/` 디렉토리를 스캔하여 기존 작업을 확인합니다.
 > `.forge-flow/` 디렉토리가 없으면 생성하고 스캔을 건너뜁니다.
+
+> **활성 작업 정의**: state 파일의 `phase` 필드가 다음 중 하나면 **활성**으로 간주: `clarifying`, `reviewing-req`, `req-reviewed`, `planning`, `reviewing-plan`, `implementing`, `verifying`, `verified`, `testing`, `tested`, `awaiting_manual_result`, `completing`. `phase`가 `completed` 또는 `cancelled`이면 비활성(작업 탐색 제외). 마이그레이션은 활성 작업 데이터(state/design/rework-log)를 건드리지 않습니다.
 
 ### 시나리오 분기
 
@@ -307,7 +392,7 @@ state 파일에 `work_dir`을 기록하지 않습니다 (기존 동작 유지). 
    - 성공 시 → `worktrees/` 디렉토리를 프로젝트 루트의 `.gitignore`에 추가 (이미 있으면 스킵)
    - 실패 시 (브랜치 미존재, 경로 중복 등) → 오류 메시지 표시 후 1-B단계 처음으로 돌아가 선택지 재표시
 
-4. **의존성 설치**: CLAUDE.md `## 빌드 명령`이 설정되어 있으면 워크트리 내에서 의존성 설치 실행 안내:
+4. **의존성 설치**: `.forge-flow/config.json`의 `build_commands`가 설정되어 있으면 워크트리 내에서 의존성 설치 실행 안내:
    ```
    워크트리가 생성되었습니다: worktrees/{name}/
    의존성 설치가 필요할 수 있습니다: cd worktrees/{name} && {빌드 명령}

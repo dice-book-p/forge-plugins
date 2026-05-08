@@ -8,7 +8,7 @@ user-invocable: false
 
 대상 레이어 또는 서비스의 빌드를 실행하고 결과를 보고합니다.
 
-> **프로젝트 설정 로드**: 실행 시작 시 CLAUDE.md의 `## 빌드 명령` 섹션을 Read합니다.
+> **프로젝트 설정 로드**: 실행 시작 시 `.forge-flow/config.json`의 `build_commands` 필드를 Read합니다.
 
 ## 사용법
 
@@ -16,7 +16,7 @@ user-invocable: false
 /forge-flow:build-check [대상]
 ```
 
-빌드 대상과 명령은 CLAUDE.md의 `## 빌드 명령` 섹션에 정의되어 있습니다.
+빌드 대상과 명령은 `.forge-flow/config.json`의 `build_commands` 필드에 정의되어 있습니다(스키마: `clarify` SKILL.md `## 첫 실행 부트스트랩` 섹션 참조).
 인자 없이 실행하면 `all` 대상으로 전체 빌드를 수행합니다.
 
 ## 결과 보고 형식
