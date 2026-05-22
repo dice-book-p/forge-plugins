@@ -1,6 +1,14 @@
 # forge-flow Changelog
 
-## v4.0.0
+## v4.0.1
+
+- **feat**: `review-req` 사용자 보고 출력 포맷 표준화 — 작업자가 중간 단계에서 방향 검토 가능하도록 통일된 골격 도입
+  - **신규 섹션** "사용자 보고 출력 포맷 (표준)" 추가 (`skills/review-req/SKILL.md` 3단계 결과 종합 직전)
+  - **4가지 판정 골격** 정의: PASS / CONCERNS / REWORK / FAIL — `[review-req] 판정 → 다음 액션` 헤더 + `확인 필요`/`핵심 결정`/`차단 사유` 블록 + `세부 보기: "세부" 입력` 접힘 컨벤션
+  - **핵심 결정 블록**: design 문서의 확정 AC/설계 결정을 3~7개로 압축. 작업자가 자기 의도와 1:1 비교 → 방향 어긋남 즉시 감지 목적
+  - 기존 "[요구사항 검수 완료]" 보고 블록을 PASS 골격 호출로 교체. CONCERNS/REWORK/FAIL 4개 분기 모두 골격 호출로 명시 (FAIL은 REWORK 3회 에스컬레이션 분기 포함)
+  - **시범 적용**: review-req 1개 스킬만. 작업자 검증 후 `review-plan`/`verify`/`test`에 동일 골격 확장 예정
+  - **affected**: `skills/review-req/SKILL.md`
 
 - **feat (major)**: 플러그인 자체 완결 구조로 리아키텍처 — 사용자 업데이트 부담 제거 + TDD 워크플로 도입
   - **훅 자체 등록**: 3개 훅(`workflow-state`/`stop-guard`/`dangerous-cmd-guard`)을 `hooks/hooks.json`으로 플러그인이 자체 등록. 사용자 `~/.claude/settings.json` 글로벌 패치 의존 제거.

@@ -8,7 +8,7 @@
       "name": "forge-flow",
       "source": "./forge-flow",
       "description": "Claude Code 워크플로 자동화",
-      "version": "4.0.0"
+      "version": "4.0.1"
     }
   ]
 }
