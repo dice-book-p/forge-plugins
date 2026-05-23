@@ -1,5 +1,18 @@
 # forge-flow Changelog
 
+## v4.0.2
+
+- **fix (critical)**: CC 2.1+ 환경변수 드리프트 대응 — 세션 바인딩 복구
+  - **증상**: Claude Code 2.1.x 가 `CLAUDE_SESSION_ID` → `CLAUDE_CODE_SESSION_ID`로 환경변수명 변경. 기존 훅이 빈 문자열을 SESSION_ID로 사용해 모든 워크플로 상태 파일의 세션 바인딩 실패. → `workflow-state.sh`가 "미완료 작업 N건" 메시지로 항상 폴백, `stop-guard.sh`가 미완료 종료를 차단하지 못함.
+  - **수정**: 두 훅 모두 stdin JSON 의 `session_id` 우선 파싱 + env 폴백(`CLAUDE_CODE_SESSION_ID` → 레거시 `CLAUDE_SESSION_ID`) 체인 적용. stdin 은 hook spec 보장이라 가장 견고.
+  - **affected**: `hooks/workflow-state.sh`, `hooks/stop-guard.sh`
+
+- **fix (critical)**: PreToolUse 훅 출력 포맷 드리프트 대응 — 위험 명령 차단 복구
+  - **증상**: CC 2.1+ 가 PreToolUse 의 bare 포맷(`{"permissionDecision":"deny","reason":...}`)을 무시. `dangerous-cmd-guard.sh`가 항상 무력화되어 `rm -rf`/`git reset --hard`/`git push --force`/`DROP TABLE` 등이 차단되지 않음.
+  - **수정**: 출력을 `hookSpecificOutput` 래퍼로 감싸고 키명 `permissionDecisionReason` 으로 변경 — `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"..."}}`. CC 2.1 spec 준수.
+  - **검증**: stdin payload 직접 주입 시 wrapper JSON 정상 출력 확인.
+  - **affected**: `hooks/dangerous-cmd-guard.sh`
+
 ## v4.0.1
 
 - **feat**: `review-req` 사용자 보고 출력 포맷 표준화 — 작업자가 중간 단계에서 방향 검토 가능하도록 통일된 골격 도입

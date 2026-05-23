@@ -9,7 +9,9 @@
 trap '' PIPE  # Claude Code가 파이프를 일찍 닫아도 SIGPIPE로 비정상 종료 방지
 
 INPUT=$(cat)
-SESSION_ID="${CLAUDE_SESSION_ID}"
+# session_id: stdin JSON 우선, env 폴백 (CC 2.1+ 는 CLAUDE_CODE_SESSION_ID, 구버전은 CLAUDE_SESSION_ID)
+SESSION_ID=$(printf '%s' "$INPUT" | (command -v jq >/dev/null 2>&1 && jq -r '.session_id // empty' 2>/dev/null || python3 -c "import json,sys; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null))
+[ -z "$SESSION_ID" ] && SESSION_ID="${CLAUDE_CODE_SESSION_ID:-$CLAUDE_SESSION_ID}"
 
 # v3 → v4 마이그레이션 안내 (AC-7/AC-8 연동)
 # 마커 부재 + settings.json에 v3 forge-flow 훅 잔재 감지 시 사용자에게 진입점 안내

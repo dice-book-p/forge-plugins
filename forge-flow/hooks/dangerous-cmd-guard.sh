@@ -3,7 +3,8 @@
 #
 # 등록: ~/.claude/settings.json hooks.PreToolUse (글로벌, matcher: "Bash")
 # stdin: { "tool_name": "Bash", "tool_input": { "command": "..." } }
-# stdout: { "permissionDecision": "deny", "reason": "..." } 또는 빈 출력(허용)
+# stdout: { "hookSpecificOutput": {"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"..."} } 또는 빈 출력(허용)
+# (CC 2.1+ 는 bare 포맷 무시 — hookSpecificOutput 래퍼 필수)
 
 trap '' PIPE  # Claude Code가 파이프를 일찍 닫아도 SIGPIPE로 비정상 종료 방지
 
@@ -28,13 +29,13 @@ fi
 
 # 위험 명령 패턴 검사 (변형 패턴 포함)
 if printf '%s' "$CMD" | grep -qiE '(rm\s+(-[a-z]*r[a-z]*\s+-[a-z]*f|--recursive.*--force|-rf|-fr)|DROP\s+TABLE|git\s+push\s+.*--force|git\s+reset\s+--hard|kubectl\s+delete|truncate\s+table)'; then
-  echo '{"permissionDecision": "deny", "reason": "위험 명령 감지: 사용자 확인이 필요합니다."}'
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"위험 명령 감지: 사용자 확인이 필요합니다."}}'
   exit 0
 fi
 
 # 민감 파일 수정 명령 검사
 if printf '%s' "$CMD" | grep -qE '(\.env|\.key|\.pem|credentials|secret|token)' && printf '%s' "$CMD" | grep -qE '(cat >|echo.*>|sed -i|tee|>>)'; then
-  echo '{"permissionDecision": "deny", "reason": "민감 파일 수정 감지: 사용자 확인이 필요합니다."}'
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"민감 파일 수정 감지: 사용자 확인이 필요합니다."}}'
   exit 0
 fi
 
