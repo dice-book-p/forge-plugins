@@ -42,9 +42,13 @@ function lensesFor(n) {
 
 // 공격적 모드 (A.aggressive=true): 예산 여유만큼 검증자 증원 (렌즈풀 상한).
 // 파일럿 디폴트 = conservative-first(증원 안 함). 발동 신뢰성 입증 후 켠다.
+// 실측(pilot wf_0c662167): 검증자 1렌즈 풀비용 = refute 증폭 포함 ~82.8k → 120k/렌즈 provision은 ~1.45x 헤드룸(타당).
+// 산정: strength = floor(remaining/120k)로 직접. (기존 1+floor는 base 검증자 1명을 무상 추가 →
+//       저예산서 한 단계 초과 provision: budget=120k일 때 strength=2(240k 필요)로 하드 예산 한도 도달 위험.)
+//       단 scale 기본 강도 밑으론 안 내림(aggressive는 증원 전용).
 if (A.aggressive && budget && budget.total) {
-  const extra = Math.floor(budget.remaining() / 120_000)   // ~120k당 검증자 +1
-  strength = Math.min(strength + extra, LENS_POOL.length)
+  const affordable = Math.floor(budget.remaining() / 120_000)   // 120k당 검증자 1명 provision
+  strength = Math.min(Math.max(strength, affordable), LENS_POOL.length)
 }
 
 // ── 스키마 ────────────────────────────────────────────────────────
