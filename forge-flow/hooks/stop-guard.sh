@@ -26,6 +26,7 @@ fi
 if command -v jq >/dev/null 2>&1; then
   _json_read() { jq -r "$1" "$2" 2>/dev/null; }
   _json_set_int() { jq --argjson v "$3" ".$2 = \$v" "$1" > "$1.tmp" && mv "$1.tmp" "$1"; }
+  _json_set_str() { jq --arg v "$3" ".$2 = \$v" "$1" > "$1.tmp" && mv "$1.tmp" "$1"; }
 else
   _json_read() {
     local key="${1#.}"
@@ -36,6 +37,12 @@ else
 import json
 with open('$1') as f: d=json.load(f)
 d['$2']=$3
+with open('$1','w') as f: json.dump(d,f,ensure_ascii=False)
+" 2>/dev/null; }
+  _json_set_str() { python3 -c "
+import json
+with open('$1') as f: d=json.load(f)
+d['$2']='''$3'''
 with open('$1','w') as f: json.dump(d,f,ensure_ascii=False)
 " 2>/dev/null; }
 fi
@@ -64,20 +71,31 @@ PHASE=$(_json_read '.phase' "$STATE_FILE")
 # 설계 의도: verify/test PASS 이후(verified, tested)와 마무리 중(completing, completed)만 통과 허용.
 # awaiting_manual_result: 사용자가 직접 테스트 실행 후 돌아와야 하므로 세션 종료 허용.
 # clarifying~implementing 등 워크플로 진행 중인 모든 단계는 차단하여 미완료 종료 방지.
-if [ "$PHASE" = "verified" ] || [ "$PHASE" = "tested" ] || [ "$PHASE" = "completing" ] || [ "$PHASE" = "completed" ] || [ "$PHASE" = "awaiting_manual_result" ]; then
+if [ "$PHASE" = "verified" ] || [ "$PHASE" = "tested" ] || [ "$PHASE" = "completing" ] || [ "$PHASE" = "completed" ] || [ "$PHASE" = "awaiting_manual_result" ] || [ "$PHASE" = "cancelled" ]; then
   exit 0
 fi
 
-# 4. Circuit breaker — stop_count 기반
+# 4. Circuit breaker — phase별 stop_count (phase 전진 시 재무장, phase당 1회 강제통과)
+# 기존 버그: 3회 도달 시 stop_count=0 리셋 → 매 3회마다 미완료 작업이 전역 반복 탈출.
+# 수정: 리셋 제거 + phase별 카운터. phase가 전진(=진짜 진행)해야만 재무장.
 STOP_COUNT=$(_json_read '.stop_count // 0' "$STATE_FILE")
-STOP_COUNT=$((STOP_COUNT + 1))
+STOP_PHASE=$(_json_read '.stop_phase // ""' "$STATE_FILE")
 
-# stop_count 갱신
+# phase가 바뀌었으면(워크플로 전진) 카운터 재무장
+if [ "$STOP_PHASE" != "$PHASE" ]; then
+  STOP_COUNT=0
+  _json_set_str "$STATE_FILE" "stop_phase" "$PHASE"
+  _json_set_int "$STATE_FILE" "force_passed" 0
+fi
+
+STOP_COUNT=$((STOP_COUNT + 1))
 _json_set_int "$STATE_FILE" "stop_count" "$STOP_COUNT"
 
+# 동일 phase에서 3회째부터 강제통과 (무한 루프 방지). stop_count 리셋하지 않음 →
+# 같은 phase 내 1회만 무장되고, 전진 없이는 재탈출 사이클이 생기지 않음.
+# force_passed=1 마커는 UserPromptSubmit 훅이 다음 턴에 "미완료 강제통과" 경고로 노출 가능.
 if [ "$STOP_COUNT" -ge 3 ]; then
-  # 연속 3회 차단 → 강제 통과 (무한 루프 방지)
-  _json_set_int "$STATE_FILE" "stop_count" 0
+  _json_set_int "$STATE_FILE" "force_passed" 1
   exit 0
 fi
 

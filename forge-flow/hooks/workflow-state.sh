@@ -89,7 +89,7 @@ if ls .forge-flow/state/*.json 1>/dev/null 2>&1; then
   for sf in .forge-flow/state/*.json; do
     [ -f "$sf" ] || continue
     SF_PHASE=$(_json_read '.phase' "$sf")
-    if [ "$SF_PHASE" = "completed" ]; then
+    if [ "$SF_PHASE" = "completed" ] || [ "$SF_PHASE" = "cancelled" ]; then
       SF_KEEP=$(_json_read '.keep_design' "$sf")
       if [ "$SF_KEEP" != "true" ]; then
         SF_DESIGN=$(_json_read '.design_file' "$sf")

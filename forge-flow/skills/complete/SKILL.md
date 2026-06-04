@@ -79,13 +79,27 @@ multiSelect: false
   1. 워크트리의 변경 사항이 모두 커밋되었는지 확인 (미커밋 시 2단계에서 먼저 커밋)
   2. 원본 repo에서 base branch 체크아웃: `git -C {repo_root} checkout {base_branch}`
   3. 워크트리 브랜치를 merge: `git -C {repo_root} merge {worktree_branch}`
-  4. merge 성공 확인 후 워크트리 삭제: `git -C {repo_root} worktree remove {work_dir_path}`
-  5. state에서 `work_dir`, `base_branch` 필드를 `null`로 갱신
+  4. **merge 결과 확인 (충돌 분기 — 필수)**:
+     - merge **성공** (exit 0) → 5단계 진행.
+     - merge **충돌/실패** (exit ≠ 0) → **아래 "merge 충돌 처리"로 분기**. 워크트리 삭제·state 갱신 진행 금지.
+  5. merge 성공 확인 후 워크트리 삭제: `git -C {repo_root} worktree remove {work_dir_path}`
+  6. state에서 `work_dir`, `base_branch` 필드를 `null`로 갱신
   > 주의: 워크트리는 단일 브랜치에 고정되어 있으므로, merge는 반드시 원본 repo({repo_root})에서 실행합니다.
+
+  **merge 충돌 처리** (3단계가 비-0 종료 시):
+  1. `git -C {repo_root} merge --abort`로 base branch를 머지 전 상태로 원복 (반쯤 머지된 트리 방지).
+  2. 워크트리 **삭제하지 않음** — 변경 보존.
+  3. **phase를 안전 상태 `"tested"`로 되돌림** (또는 test 미수행 시 `"verified"`). completing에 멈춰 stop-guard를 통과시켜 반쯤 머지된 채 종료되는 것을 방지.
+  4. 사용자에게 `AskUserQuestion`: "base branch와 merge 충돌이 발생했습니다." / 옵션:
+     - "수동 해결" — 충돌 파일 안내, 사용자가 직접 해결 후 complete 재호출
+     - "PR로 전환" — push + `gh pr create`로 우회 (충돌은 PR에서 해결)
+     - "중단" — `/forge-flow:cancel`로 작업 취소
 
 - **"PR 생성"** 선택 시:
   1. `git -C {work_dir} push -u origin {worktree_branch}`
+     - **push 실패 시** (인증/원격 없음/거부): phase를 `"tested"`(또는 `"verified"`)로 되돌리고 워크트리 유지. 사용자에게 원인 보고 후 "재시도 / merge로 전환 / 중단" 확인. 워크트리 삭제 금지.
   2. `gh pr create` (base: `{base_branch}`)
+     - **PR 생성 실패 시**: 브랜치는 이미 push됨 → 사용자에게 수동 PR 링크 안내, phase 유지.
   3. 워크트리 유지 — state의 `work_dir` 보존
 
 - **"유지"** 선택 시:
