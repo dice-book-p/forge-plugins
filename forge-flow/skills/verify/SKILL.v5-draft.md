@@ -100,10 +100,11 @@ Workflow 반환 `{ verdict, round, findings, rework, concerns }` 해석:
 5. phase → `implementing`. `stop_count` 리셋 안 함.
 6. 코드 수정 → `/forge-flow:verify` 재호출.
 
-**에스컬레이션 (`rework_lifetime.verify` ≥ 3)**:
-- 보고 + `AskUserQuestion`: "아키텍처 재검토 후 재시도" / "FAIL로 에스컬레이션".
-- 재시도 → `rework_counts.verify`=0, phase=`implementing`.
-- FAIL → phase=`clarifying`, `rework_counts` 리셋(`rework_lifetime` 유지), `convergence_round`=0.
+**에스컬레이션 — ① 전역 상한 먼저, ② per-gate**:
+- **① 전역 상한 (게이트 간 핑퐁 방지)**: `rework_lifetime.verify` + `rework_lifetime.test` (모든 `rework_lifetime.*` 합산) ≥ **6**이면 per-gate보다 우선. 핑퐁은 per-gate 카운터를 리셋시키며 무한 왕복하므로 전역 누적(리셋 없음)으로 검사. 보고 + `AskUserQuestion`: "clarify 재진입 — 요구사항부터 재검토 (Recommended)" / "현재 게이트 계속". clarify 재진입 → phase=`clarifying`, `rework_counts` 리셋(`rework_lifetime` 유지).
+- **② per-gate (`rework_lifetime.verify` ≥ 3)** — 전역 미달 시: 보고 + `AskUserQuestion`: "아키텍처 재검토 후 재시도" / "FAIL로 에스컬레이션".
+  - 재시도 → `rework_counts.verify`=0, phase=`implementing`.
+  - FAIL → phase=`clarifying`, `rework_counts` 리셋(`rework_lifetime` 유지), `convergence_round`=0.
 
 ## 8. 완료 상태 기록 + 다음 단계
 

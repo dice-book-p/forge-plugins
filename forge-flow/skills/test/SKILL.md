@@ -288,7 +288,7 @@ header: "수동 테스트"
 | **재작업**(REWORK) | AC 미충족 (기능 미동작, API 에러 등) | 해당 부분 수정 → 재테스트 |
 | **실패**(FAIL) | 근본적 문제 (페이지 미로딩, 서버 에러 등) | 이전 단계부터 재검토 |
 
-> **재작업 연속 3회 시 실패로 에스컬레이션.**
+> **누적 재작업(`rework_lifetime.test`) 3회 도달 시 에스컬레이션** (verify SKILL.md "에스컬레이션" 절과 동일 프로세스).
 
 ### 수렴 검증 (Convergence Verification)
 
@@ -339,7 +339,8 @@ multiSelect: false
 3. **rework-log 기록** (verify SKILL.md의 "Rework Log 관리" 규칙에 따름, 차원 태그 `[코드]` 기본 부여) — 루트코즈 가설 포함
 4. 상태 파일 카운터 갱신:
    - `rework_counts.test` +1 (PASS 시 리셋되는 라운드 내 카운터)
-   - `rework_lifetime.test` +1 (리셋 없는 전체 누적, `rework_lifetime.test` ≥ 3이면 에스컬레이션 — verify와 동일 프로세스)
+   - `rework_lifetime.test` +1 (리셋 없는 전체 누적)
+   - **에스컬레이션 검사 (verify SKILL.md "에스컬레이션" 절과 동일 프로세스)**: ① **전역 상한 먼저** — `rework_lifetime.verify` + `rework_lifetime.test` ≥ 6이면 게이트 간 핑퐁으로 판단, clarify 재진입 권장. ② 전역 미달 시 per-gate — `rework_lifetime.test` ≥ 3이면 에스컬레이션.
 5. phase를 `"implementing"`으로 되돌림
 6. 코드 수정 (루트코즈 가설 기반 단일 수정)
 7. 수정 완료 후 `/forge-flow:verify` → `/forge-flow:test` 재실행
