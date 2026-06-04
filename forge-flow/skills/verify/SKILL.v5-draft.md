@@ -55,10 +55,12 @@ design `## 검증 설정`에서:
 
 `workflows/verify.js`를 **Workflow 도구로 호출**한다.
 
-> **scriptPath 절대경로 해결 (필수)**: SKILL.md 본문의 `${CLAUDE_PLUGIN_ROOT}`는 훅(셸)에서만 확장되고 **모델이 읽는 마크다운에선 확장 보장 안 됨**. 따라서 호출 전 플러그인 루트 절대경로를 직접 구해라:
-> 1. 이 스킬 파일 경로(`.../forge-flow/skills/verify/SKILL.md`)에서 상위 2단계 = 플러그인 루트 → `<루트>/workflows/verify.js`.
-> 2. 또는 `.forge-flow/config.json`에 `plugin_root`를 1회 기록해 재사용.
-> 절대경로로 `scriptPath` 전달. (이 경로 해결 실패 = 파일럿이 측정하려는 "발동 신뢰성"의 핵심 변수)
+> **scriptPath 절대경로 해결 (필수)**: SKILL.md 본문의 `${CLAUDE_PLUGIN_ROOT}`는 훅(셸)에서만 확장되고 **모델이 읽는 마크다운/셸 환경 모두에서 확장 보장 안 됨** (실측: 셸 `$CLAUDE_PLUGIN_ROOT` 비어있음). 또한 cold 세션에선 스킬 파일의 절대경로도 모델에 안 주어지므로 "스킬 파일 경로 상위 2단계" 방식도 불신뢰. 아래 순서로 구해라:
+> 1. **(권장) glob 탐색**: `ls -d ~/.claude/plugins/marketplaces/*/forge-flow/workflows/verify.js` 실행 → 정확히 1개면 그 경로 사용. 프로젝트-로컬 설치 대비 `.claude/plugins/marketplaces/*/forge-flow/workflows/verify.js`도 함께 확인.
+>    - **0개**: 플러그인 미설치 → 사용자에게 보고, 중단.
+>    - **2개 이상**: 설치 플러그인의 마켓플레이스와 일치하는 것 우선, 모호하면 사용자에게 확인.
+> 2. **(캐시) `.forge-flow/config.json`의 `plugin_root`**: 존재하면 `<plugin_root>/forge-flow/workflows/verify.js` 사용 (1번 glob 결과를 여기 1회 기록해두면 재호출 시 재사용). 없으면 1번으로 폴백.
+> 해결된 절대경로로 `scriptPath` 전달. (경로 해결 실패 = "발동 신뢰성"의 핵심 변수 — pilot journal `wf_0c662167`에서 scriptPath-mode 자체는 입증됨, 미입증분은 cold-context 경로 해결뿐이라 본 절차로 닫음)
 
 ```
 Workflow({
