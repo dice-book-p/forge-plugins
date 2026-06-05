@@ -1,490 +1,172 @@
 ---
 name: verify
-description: "작업 내용 종합 검수 — 구현 완료 시 빌드 검증 + 에이전트팀 외부 검수를 수행합니다. 코드 변경 완료, 구현 완료 시 자동 트리거."
+description: "작업 종합 검수 — 빌드 검증(메인) + Workflow 외부검수(렌즈 fan-out + 적대적 확정 + 수렴). 구현 완료 시 자동 트리거."
 ---
 
-구현 완료된 코드를 design 문서 기준으로 **코드 수준 검증**합니다.
-메인 세션은 빌드 검증(기계적)만 수행하고, 모든 평가는 에이전트팀 외부 검수로 위임합니다.
+> **v5 파일럿 드래프트.** 기존 SKILL.md(에이전트팀 산문 ~17K)를 Workflow 호출로 대체. 라이브 교체 전 검토용.
+> **충실도 주의**: verdict/강도/독립성/seam은 보존. 단 **수렴 의미는 의도적으로 재정의** — 아래 §3 참조 (원본은 "while round<max"와 "1 clean round 조기종료"가 자체 모순이라 그대로 복제 안 함).
+> **규모**: 파일럿은 **conservative-first** (검증자 = 원본 기본값, fan-out 증원 안 함). 발동 신뢰성 입증 후 `aggressive` 켜서 budget 연동 증원.
 
-> **하네스 원칙**: 생산자(구현 세션) ≠ 평가자. 메인 세션은 오케스트레이터(빌드 + 팀 구성 + 숙의)이며, 코드 평가를 직접 수행하지 않습니다.
+구현 완료 코드를 design 기준 **코드 수준 검증**. 메인은 빌드검증(기계적) + Workflow 오케스트레이션만, 코드 평가는 Workflow 검증자에 위임.
 
-> 실제 런타임 테스트(브라우저 UI/UX, API 호출)는 `/forge-flow:test`에서 수행합니다.
+> **하네스 원칙**: 생산자 ≠ 평가자. 메인은 오케스트레이터(빌드 + Workflow 호출 + verdict 라우팅), 코드 직접 평가 안 함.
+> 런타임 테스트(브라우저/API)는 verify 아닌 test 영역.
 
-## 선행 조건 검사
+---
 
-실행 전 반드시 확인:
-1. 현재 세션에 바인딩된 상태 파일 탐색 → `.forge-flow/state/`에서 `session_id`가 현재 세션(`${CLAUDE_SESSION_ID}`)과 일치하는 `{task_id}.json` 파일 탐색 → 없으면: "워크플로가 시작되지 않았습니다. `/forge-flow:clarify`로 시작하세요."
-2. phase가 `"implementing"` 또는 `"verifying"`인지 확인 → 아니면: "현재 `{phase}` 단계입니다. 구현 완료 후 verify를 실행하세요."
-3. `design_file`이 존재하는 파일 경로인지 확인 → 없으면: "설계 문서를 찾을 수 없습니다."
-4. **단위검증 미실행 unit 검사 (M/L 규모, design `### work units` 섹션이 있을 때만)**:
-   - design 파일을 읽어 `## 구현 계획` 하위에 `### work units` 마커와 표가 있는지 확인. **없으면 본 검사 전체 스킵**(AC-10 하위 호환).
-   - 표가 있으면 각 unit의 검증방식이 `스킵(...)`이 아닌데 구현자/리더 보고에 PASS 기록이 없는 unit을 식별 → 미실행 unit이 있으면 사용자에게 목록을 보고하고 다음 중 하나 확인:
-     - "단위검증을 마저 실행한 뒤 verify를 다시 시도하세요."로 안내하고 진입 차단
-     - 사용자가 "단위검증 면제하고 verify 진행"을 명시하면 사유를 받아 `## 검수 결과`에 기록 후 진입 허용
-   - **주의**: 마커·표 파싱 실패(잘못된 형식) 시에는 본 검사를 스킵하고 경고만 표시(false-positive 방지). AC-10 판정을 항상 먼저 수행.
+## 1. 선행 조건 검사 (메인)
 
-5. **단위테스트-TDD RED 단계 기록 검사 (M/L 규모, TDD on 작업)**:
-   - design `### work units` 표에서 검증방식이 `단위테스트-TDD`인 unit을 식별.
-   - 각 `단위테스트-TDD` unit에 대해 구현자/리더 보고에 **RED 단계 기록**(실패 테스트 작성 + 실행 결과 FAIL 확인)이 있는지 확인.
-   - **RED 단계 기록 부재 시 진입 차단** — "단위테스트-TDD unit `{WU-id}`의 RED 단계 기록이 없습니다. 실패 테스트 작성+실행 후 verify를 다시 시도하세요." 안내.
-   - **게이트 엄격도**: `단위테스트-TDD` 검증방식만 차단. 다른 검증방식(`단위테스트`/`수동`/`스킵`)은 본 검사 대상 외 — 4번 검사로만 처리.
-   - 4번 사용자 면제 경로와 동일하게 "RED 게이트 면제"가 명시되면 사유를 `## 검수 결과`에 기록 후 진입 허용.
+1. 세션 바인딩 상태파일 탐색 (`session_id` == `${CLAUDE_SESSION_ID}`) → 없으면 "워크플로 미시작. /forge-flow:clarify로 시작."
+2. `phase` ∈ {`implementing`, `verifying`} → 아니면 "현재 {phase} 단계. 구현 완료 후 verify."
+3. `design_file` 존재 → 없으면 "설계 문서 없음."
+4. **단위검증 미실행 검사** (M/L, design `### work units` 표 있을 때만): 검증방식이 `스킵`이 아닌데 PASS 기록 없는 unit → 차단 안내 또는 사용자 면제(사유 기록). 표 파싱 실패 시 스킵+경고.
+5. **단위테스트-TDD RED 기록 검사** (M/L, TDD on): `단위테스트-TDD` unit의 RED 기록 부재 시 차단. 면제 시 사유 기록.
 
-> **단위검증과 verify의 역할 경계**:
-> - **단위검증** (implement 중) = 구현자 본인이 work unit 단위로 로직·엣지케이스를 자체 검증
-> - **verify** (구현 완료 후) = 에이전트팀 외부자가 design AC 기준 코드 수준 종합 검수
-> - **test** (verify 통과 후) = 통합·UX 시나리오 런타임 검증
-> 세 게이트는 시점·주체·범위가 다르며 함께 사용해도 중복이 아닙니다. 단위검증이 누락되면 verify가 위 4번에서 게이트로 차단합니다.
+6. **phase drift sanity-check (phase ↔ 실제 산출물 대조)** — drift는 cross-turn 상태(수동편집·크래시·세션재개) 검사라 하네스(SKILL) 책임. 위 1~5 통과 후, §2 상태 갱신 전에 수행:
+   - **강신호 → 진입 차단**: `base_branch`가 **설정된 경우** `git diff {base_branch}...HEAD --stat` + `git status --porcelain` 확인. phase가 `verifying`/`implementing`인데 **커밋·미커밋 변경이 모두 0**이면 드리프트로 판단, **진입 차단**: "phase가 `{phase}`인데 `{base_branch}` 대비 변경된 코드가 없습니다. 구현이 실제로 이뤄졌는지, 올바른 작업 디렉토리/브랜치인지 확인하세요." (`base_branch` 미설정 시 이 강신호 검사는 스킵.)
+   - **약신호 → 경고 후 진행**: design `## 검수 결과`에 현재보다 **앞선 단계의 PASS 기록**(예: phase=`verifying`인데 `test: PASS`)이 있는데 그 사이 REWORK 기록이 없으면 → 경고 후 진행: "문서에 `{기록단계}` PASS가 있으나 현재 phase는 `{phase}`입니다. 이전 단계가 의도적으로 되돌려졌는지 확인하세요."
 
-6. **phase drift sanity-check (phase ↔ 실제 산출물 대조)**:
-   상태 phase가 실제 저장소/문서 상태와 모순되는지 확인합니다 (수동 편집·크래시·세션 재개로 인한 드리프트 검출). 위 1~5번 통과 후, 상태 갱신 전에 수행:
-   - **작업 위치 결정**: `work_dir`이 있으면 그 워크트리에서, 없으면 현재 디렉토리에서 git 확인.
-   - **코드 산출물 대조 (강한 신호)**:
-     - `base_branch`가 **설정된 경우** (신뢰 가능한 기준): `git diff {base_branch}...HEAD --stat` + `git status --porcelain` 확인. phase가 `verifying`/`implementing`인데 **커밋·미커밋 변경이 모두 0**이면 → 드리프트로 판단, **진입 차단**: "phase가 `{phase}`인데 `{base_branch}` 대비 변경된 코드가 없습니다. 구현이 실제로 이뤄졌는지, 올바른 작업 디렉토리/브랜치인지 확인하세요."
-     - `base_branch`가 **null인 경우** (기준 불명, false-positive 방지): `git status --porcelain`만 확인. 미커밋 변경이 없어도 코드가 이미 커밋되었을 수 있으므로 **차단하지 않고 경고만** 표시.
-   - **문서 산출물 대조 (약한 신호 — 경고만)**:
-     - design `## 검수 결과`에 현재보다 **앞선 단계의 PASS 기록**이 있는데(예: phase=`verifying`인데 `test: PASS` 기록 존재) 그 사이 REWORK 기록이 없으면 → 경고 후 진행: "문서에 `{기록단계}` PASS가 있으나 현재 phase는 `{phase}`입니다. 이전 단계가 의도적으로 되돌려졌는지 확인하세요."
-   - 강한 신호 차단이 없으면 (경고만 있거나 모두 정상) 정상 진입.
+> **워크플로 fail-fast로 메울 수 없는 이유**: `verify.js`는 빈 `gitDiff`면 throw하나 — ① 기준이 다름(working diff ≠ `base_branch...HEAD`, 커밋된 구현은 working diff 비어도 정상), ② throw는 `args 교정`으로 안내돼 "구현 안 됨" 진단과 UX 상이, ③ phase 거짓 자체는 in-turn 워크플로가 못 봄. 그래서 본 검사는 SKILL에 유지.
 
-## 상태 파일 갱신
+## 2. 상태파일 갱신 (시작)
 
-실행 시작 시:
 ```json
 { "phase": "verifying" }
 ```
+카운터 의미 (변경 없음):
+- `rework_counts.verify`: 라운드 내 REWORK 횟수. PASS/재시도 시 0 리셋.
+- `rework_lifetime.verify`: 작업 전체 누적(리셋 없음). 에스컬레이션·경고 기준.
+- `convergence_round`: 현재 수렴 라운드. REWORK 시 유지, 0건 후에만 +1.
 
-> **rework_counts 독립 추적**: 상태 파일의 `rework_counts.verify`를 사용합니다 (다른 스킬의 카운터와 독립).
-> 최초 진입 판단: 이전 phase가 `"implementing"`이고 **`rework_counts.verify`가 0 (또는 미존재)**이면 최초 진입 → `rework_counts.verify: 0`. 그 외(`rework_counts.verify > 0`)이면 재진입 → 유지.
-> **세션 재개 안전장치**: REWORK 후 phase가 `"implementing"`으로 되돌아간 상태에서 세션이 종료·재개되어도, `rework_counts.verify > 0`이면 재진입으로 올바르게 판단합니다.
-> **test REWORK와의 독립성**: test REWORK로 phase가 `"implementing"`이 되어도 `rework_counts.verify`는 0이므로 verify는 최초 진입으로 정확히 판단합니다. 이때 `convergence_round`도 0으로 초기화합니다 (새로운 verify 사이클 시작).
+최초 진입 판단: 이전 phase `implementing` & `rework_counts.verify`==0 → 최초(0 세팅). test REWORK 유입(`rework_counts.verify`==0)이면 `convergence_round`도 0 초기화.
 
-**상태 파일 카운터 구조**:
+## 3. 검증 설정 읽기 (메인)
+
+design `## 검증 설정`에서:
+- **검증 강도**(=검증자 수): 미설정 시 규모기본 S=1 / M=1 / L=2. 최소 1.
+- **수렴 상한**(=필요한 **연속 clean 라운드 수**): 미설정 시 S=1 / M=1 / L=2. S는 1 고정.
+- 최초 진입 1회만 `AskUserQuestion`으로 변경 여부 확인. REWORK 재진입 시 안 물음.
+
+> **수렴 의미 (재정의, 명시)**: 라운드마다 새 검증자 팀이 독립 검증 → 확정 결함 0건이면 clean 카운트 +1, `convergenceMax`만큼 연속 clean 채우면 PASS. 어느 라운드든 확정 결함 나오면 즉시 REWORK 반환(`convergence_round` 유지). 원본의 "초기 PASS 후 확인 라운드" 2단 구조 대신 **단일 루프**로 통일.
+
+## 4. 빌드 검증 (메인, Workflow 전)
+
+`/forge-flow:build-check` 실행. `config.json`의 `build_commands.fe` 설정 시 `/forge-flow:fe-check`도.
+- **빌드 FAIL → 즉시 REWORK** (Workflow 호출 안 함, §7 REWORK 처리로).
+- 빌드 PASS → §5 진행.
+
+## 5. Workflow 호출 (외부 검수)
+
+`workflows/verify.js`를 **Workflow 도구로 호출**한다.
+
+> **scriptPath 절대경로 해결 (필수)**: SKILL.md 본문의 `${CLAUDE_PLUGIN_ROOT}`는 훅(셸)에서만 확장되고 **모델이 읽는 마크다운/셸 환경 모두에서 확장 보장 안 됨** (실측: 셸 `$CLAUDE_PLUGIN_ROOT` 비어있음). 또한 cold 세션에선 스킬 파일의 절대경로도 모델에 안 주어지므로 "스킬 파일 경로 상위 2단계" 방식도 불신뢰. 아래 순서로 구해라:
+> 1. **(권장) glob 탐색**: `ls -d ~/.claude/plugins/marketplaces/*/forge-flow/workflows/verify.js` 실행 → 정확히 1개면 그 경로 사용. 프로젝트-로컬 설치 대비 `.claude/plugins/marketplaces/*/forge-flow/workflows/verify.js`도 함께 확인.
+>    - **0개**: 플러그인 미설치 → 사용자에게 보고, 중단.
+>    - **2개 이상**: 설치 플러그인의 마켓플레이스와 일치하는 것 우선, 모호하면 사용자에게 확인.
+> 2. **(캐시) `.forge-flow/config.json`의 `plugin_root`**: 존재하면 `<plugin_root>/forge-flow/workflows/verify.js` 사용 (1번 glob 결과를 여기 1회 기록해두면 재호출 시 재사용). 없으면 1번으로 폴백.
+> 해결된 절대경로로 `scriptPath` 전달. (경로 해결 실패 = "발동 신뢰성"의 핵심 변수 — pilot journal `wf_0c662167`에서 scriptPath-mode 자체는 입증됨, 미입증분은 cold-context 경로 해결뿐이라 본 절차로 닫음)
+
+```
+Workflow({
+  scriptPath: "<해결한 절대경로>/workflows/verify.js",
+  args: {
+    taskId, scale,                       // 상태파일
+    strength, convergenceMax,            // §3 검증설정
+    startRound: <convergence_round>,     // 상태파일 유지값
+    projectContext: "<CLAUDE.md 스택/구조 + build_commands 요약, ≤3줄>",
+    designExcerpt: "<design ## 요구사항/AC/따를 기존 패턴/검증 방법 발췌>",
+    gitDiff: "<git diff>",
+    reworkLogExcerpt: "<rework-log 이번 영향범위 [코드]/[평가] ×2+ 발췌, 없으면 ''>"
+  }
+})
+```
+
+> **이 스킬은 위 Workflow를 반드시 호출한다** (opt-in 충족: 스킬 지시문 경로).
+> Workflow는 판정만 반환 — 렌즈별 독립 검증자 병렬 → finding당 적대적 확정(과반 반박=폐기) → 0건 라운드를 수렴상한만큼 채우면 PASS, 확정 결함 나오면 REWORK 즉시 반환.
+> 완료 `<task-notification>` 수신 = verdict 도착 신호.
+
+## 6. verdict 라우팅 (메인)
+
+Workflow 반환 `{ verdict, round, findings, rework, concerns }` 해석:
+
+| verdict | 조치 |
+|---------|------|
+| **PASS** | §8 PASS 상태 기록 → `convergence_round`=`round` → test 호출 |
+| **CONCERNS** | `AskUserQuestion`("경미 이슈, 수용 진행 / 수정 후 재검수") — 수용=PASS 처리, 수정=REWORK 처리 |
+| **REWORK** | §7 REWORK 처리 (`convergence_round`=반환 `round` 유지) |
+
+> Workflow는 `Date.now()`/사용자대화 불가 → CONCERNS 사용자판단·상태쓰기는 **메인이** 수행 (seam 계약).
+
+## 7. REWORK 처리 (메인, debug-gate)
+
+1. 문제점 보고 (`findings`의 file:line + fix).
+2. **debug-gate 루트코즈**: 재현·diff확인·흐름추적 → 루트코즈 가설 1문장 → 최소 단일수정.
+3. `rework-log.md` 기록 (가설 포함, 차원 태그 `[코드]` 기본).
+4. 카운터: `rework_counts.verify`+1, `rework_lifetime.verify`+1, `convergence_round` **유지**.
+5. phase → `implementing`. `stop_count` 리셋 안 함.
+6. 코드 수정 → `/forge-flow:verify` 재호출.
+
+**에스컬레이션 — ① 전역 상한 먼저, ② per-gate**:
+- **① 전역 상한 (게이트 간 핑퐁 방지)**: `rework_lifetime.verify` + `rework_lifetime.test` (모든 `rework_lifetime.*` 합산) ≥ **6**이면 per-gate보다 우선. 핑퐁은 per-gate 카운터를 리셋시키며 무한 왕복하므로 전역 누적(리셋 없음)으로 검사. 보고 + `AskUserQuestion`: "clarify 재진입 — 요구사항부터 재검토 (Recommended)" / "현재 게이트 계속". clarify 재진입 → phase=`clarifying`, `rework_counts` 리셋(`rework_lifetime` 유지).
+- **② per-gate (`rework_lifetime.verify` ≥ 3)** — 전역 미달 시: 보고 + `AskUserQuestion`: "아키텍처 재검토 후 재시도" / "FAIL로 에스컬레이션".
+  - 재시도 → `rework_counts.verify`=0, phase=`implementing`.
+  - FAIL → phase=`clarifying`, `rework_counts` 리셋(`rework_lifetime` 유지), `convergence_round`=0.
+
+## 8. 완료 상태 기록 + 다음 단계
+
+PASS(수렴완료):
 ```json
-{
+{ "phase": "verified", "stop_count": 0,
   "rework_counts": { "verify": 0 },
-  "rework_lifetime": { "verify": 0 },
-  "convergence_round": 0
-}
+  "rework_lifetime": { "verify": "<유지>" },
+  "convergence_round": "<최종 round>" }
 ```
+design `## 검수 결과`에 `- verify: PASS (날짜)`, 상세는 `{task_id}.review.md` 누적.
 
-> `rework_counts.verify`: 현재 라운드 내 REWORK 횟수 + 재진입 마커(L46-49). 아키텍처 재검토 "재시도" 선택 시 또는 PASS 시 0으로 리셋. **에스컬레이션 기준 아님.**
-> `rework_lifetime.verify`: 이 작업 전체 누적 REWORK 횟수 (리셋 없음). **에스컬레이션 단일 기준 (≥3)** 및 리셋 남용 감지용.
-> `convergence_round`: 현재 수렴 라운드. REWORK 시 유지 (같은 라운드에서 수정 후 재검증), 0건 확인 후에만 +1.
-
-## 검증 설정 확인
-
-design 문서의 `## 검증 설정` 섹션을 읽어 검증 강도와 수렴 상한을 확인합니다. 이 설정은 **plan 단계에서 1회 결정**되며, verify 재진입(REWORK 후 재실행) 시에도 동일 값을 그대로 사용합니다. 재진입 시 사용자에게 재확인하지 않습니다.
-
-**검증 강도**:
-- **표준 (1)**: 검증자 1명으로 검수.
-- **강화 (2+)**: 관점별 복수 검증자로 검수.
-- 미설정이면 규모 기반 기본값: **S=1, M=1, L=2**
-- 모든 규모에서 최소 강도 1 — 외부 검수 필수.
-
-**수렴 상한**:
-- design 문서의 `수렴 상한` 값 읽기
-- 미설정이면 규모 기반 기본값: **S=1, M=1, L=2**
-- S 규모는 수렴 1회 고정 (plan 4-B 설정 무관)
-
-## 규모별 검수 방식
-
-### S 규모: 경량 검수
-
-S 규모는 검증자 **1명 고정**입니다. 에이전트팀(TeamCreate)을 구성하지 않고 Agent 도구로 단일 검증자를 직접 spawn합니다. 검증 강도 설정과 무관하게 항상 1명입니다.
-
-1. **빌드 검증** (메인 세션): `/forge-flow:build-check` 실행. `.forge-flow/config.json`의 `build_commands.fe`가 설정되어 있으면 `/forge-flow:fe-check`도 실행.
-
-2. **검증자 1명 spawn**: Agent 도구로 검증자 1명을 직접 spawn (TeamCreate 없음). AC 충족 + 패턴 일관성 + 엣지케이스를 독립 검증.
-   ```
-   Agent(
-     name: "검증자",
-     prompt: "...(아래 검증자 프롬프트 템플릿)",
-     model: "sonnet"
-   )
-   ```
-3. **결과 종합**: 빌드 결과(PASS/FAIL) + 검증자 판정을 종합하여 최종 판정
-4. **수렴 검증**: 수렴 1회 고정 — 새 검증자 1명 spawn하여 재검증. 0건 → PASS, 이슈 발견 → REWORK.
-
-### M 규모: 표준 검수
-
-#### 0단계: rework-log 참조
-
-`.forge-flow/rework-log.md` 존재 시 스캔하여 이번 작업 영향 범위와 관련된 `[코드]`, `[평가]` 차원의 ×2+ 패턴 확인. 있으면 검증자 프롬프트에 포함.
-
-#### 1단계: 빌드 검증 (메인 세션)
-
-`/forge-flow:build-check` 실행. `.forge-flow/config.json`의 `build_commands.fe`가 설정되어 있으면 `/forge-flow:fe-check`도 실행.
-
-> 빌드 검증은 기계적(PASS/FAIL) 판단이므로 메인 세션에서 수행합니다. 코드 리뷰, AC 대조, 패턴 검증 등 주관적 평가는 모두 에이전트팀에 위임합니다.
-
-#### 2단계: 에이전트팀 검수
-
-검증 강도에 따라 팀 규모를 결정합니다:
-
-```
-강도 1 → 에이전트팀 1명
-강도 2+ → 에이전트팀 (관점별 복수)
-```
-
-에이전트팀으로 검증 팀을 구성합니다. 에이전트팀이 모든 코드 평가(AC 대조, 코드 리뷰, 패턴 검증, 사이드이펙트, 엣지케이스)를 수행합니다. 각 검증자는 독립 Claude Code 프로세스로 실행됩니다.
-
-**검증 관점 결정** (팀 구성 전):
-1. **기본 관점**: AC 충족, 패턴·사이드이펙트 (항상 포함)
-2. **프로젝트 관점**: CLAUDE.md `### 프로젝트 검증 관점`에서 `적용 단계`에 `verify`가 포함된 관점. **섹션 없으면 기본 관점만 사용** (폴백)
-3. **작업 관점**: design 문서 `## 검증 관점`에서 활성화된 관점 확인
-
-> 전체 검증자 수 상한: **최대 5명**. 초과 시 통합 우선순위: 작업 특화 관점 → 프로젝트 관점 순으로 가장 관련성 높은 기본 관점에 통합 배정. 그래도 초과 시 AC 연관도가 낮은 프로젝트 관점부터 제외.
-> S규모: 프로젝트 관점이 있어도 **AC 연관도가 가장 높은 1개만** 통합 검증자에 포함. 2개 이상이면 AC와의 연관도 기준으로 선택.
-
-**에이전트팀 spawn 절차**:
-
-1. **`TeamCreate` 호출**: 팀 생성
-   ```json
-   { "team_name": "verify-{task_id}", "description": "코드 검증 팀" }
-   ```
-
-2. **`TaskCreate`로 검증 작업 생성**: 각 검증 관점별로 작업 생성
-
-3. **`Agent` 도구로 팀원 spawn**: 반드시 `team_name`과 `name` 파라미터를 지정하여 에이전트팀 팀원으로 등록
-   ```
-   Agent(
-     team_name: "verify-{task_id}",
-     name: "검증자-AC",
-     prompt: "...(아래 템플릿)",
-     model: "sonnet"
-   )
-   ```
-   > `team_name` + `name`으로 에이전트팀 팀원을 등록합니다.
-
-4. **결과 수신**: 팀원의 메시지가 자동 전달됨 (폴링 불필요)
-
-5. **`SendMessage`로 종료 요청** → **`TeamDelete`로 정리**
-
-**검증 팀 구성 분석**:
-
-| 분리 기준 | 예시 |
-|----------|------|
-| **검증 관점 분리** | AC 충족 검증 / 패턴·사이드이펙트 검증 |
-| **도메인 분리** | 사용자단 시나리오 / 관리자단 시나리오 |
-| **레이어 분리** | BE 검증 (API·로직) / FE 검증 (UI·인터랙션) |
-| **코드 관점 분리** | 로직 검증 / 에러 처리 검증 / 타입 안전성 검증 |
-
-독립 검증 관점이 2개 이상이면 → 복수 팀원 구성. 1개면 → 팀원 1명으로 구성.
-
-**검증 팀 역할 정의**:
-
-| 역할 | 책임 |
-|------|------|
-| **검증자-AC** | AC 항목별 코드 위치(파일:라인) 1:1 매핑, 구현 누락 검출 |
-| **검증자-패턴** | design 문서의 `따를 기존 패턴` 기준 일관성 검증, 사이드이펙트, 엣지케이스 검증 |
-| **검증자-TDD** (AC에 통합 가능) | TDD 준수 검증: 신규 함수에 테스트 존재 여부, 테스트 커버리지, mock 과다 사용 여부 |
-
-> 역할은 프로젝트와 작업에 따라 **동적으로 결정**합니다. 위는 예시이며, 실제로는 작업 특성에 맞게 조합합니다.
-> 실제 동작 테스트(UI/UX, API)는 verify가 아닌 `/forge-flow:test`에서 수행합니다.
-
-**검증 팀 구성 보고**:
-```
-[검증 팀 구성 — 에이전트팀]
-  team: verify-{task_id}
-  검증자 A: AC 충족 검증 — 각 AC를 코드와 1:1 대조
-  검증자 B: 패턴·사이드이펙트 — 코드 품질 + 영향 범위
-
-검증 팀을 spawn합니다.
-```
-
-**검증자 프롬프트 템플릿** (`model: "sonnet"`):
-```
-당신은 {프로젝트명}의 독립 검증자입니다.
-검증 관점: {담당 관점}
-
-## 프로젝트 컨텍스트
-{CLAUDE.md(있으면)에서 기술 스택·프로젝트 구조 + `.forge-flow/config.json`의 `build_commands` 요약 — 3줄 이내}
-
-## design 문서 (발췌)
-{design 문서에서 ## 요구사항, ## 인수 조건 (AC), ## 따를 기존 패턴, ## 검증 방법 섹션만 발췌}
-
-## 변경 내용
-{git diff 결과}
-
-## 검증 항목
-{담당 관점에 해당하는 구체적 검증 항목}
-
-## TDD 준수 검증 (검증자-AC 또는 통합 검증자가 수행)
-- 신규 함수/메서드에 대응하는 테스트가 존재하는가?
-- 테스트가 실제 동작을 검증하는가? (mock 과다 사용 여부)
-- design 문서의 테스트 계획(TDD 순서)과 일치하는가?
-
-## 외과적 변경 검증 (모든 검증자가 수행)
-- **초과 구현**: 요청하지 않은 기능·추상화·에러처리가 추가되었는가? (gold-plating)
-- **인접 코드 침범**: 요청과 무관한 리팩토링·포맷팅·주석 변경이 있는가?
-- **가정 위반**: design 문서 `## 가정` 항목이 코드에서 위반되었는가?
-- **소급 가능성**: 모든 변경 라인이 AC 항목 중 하나로 소급되는가? 소급 불가 라인이 있으면 FAIL
-
-## 이 프로젝트에서 반복되는 실수 패턴 (해당 시)
-{rework-log에서 이번 작업 영향 범위와 관련된 [코드], [평가] 차원의 ×2+ 항목 발췌}
-
-위 패턴에 특히 주의하여 검증하세요.
-
-## 응답 원칙
-- PASS 항목은 한 줄로 요약 (상세 불필요)
-- FAIL 항목만 상세히: 문제 + 위치(file:line) + 수정 제안
-- 전체 응답 2,000 토큰 이내 권장
-
-## 응답 형식
-각 항목에 대해:
-- PASS: <근거 한 줄>
-- FAIL: <구체적 문제점 + 위치(file:line) + 수정 제안>
-
-## 종합 판정
-PASS / CONCERNS / REWORK / FAIL + 근거
-```
-
-> **핵심 원칙**: 메인 세션은 빌드 결과만 보유하며 코드 평가를 수행하지 않음 (하네스 원칙). 검증 팀원 간에도 결과를 공유하지 않음 (독립 판단 보장).
-
-**검증 팀 결과 종합 — 숙의(Deliberation)** (리더 = 메인 세션, 오케스트레이터 역할):
-1. 모든 검증자의 메시지 자동 수신 대기 (팀원 idle 알림으로 완료 감지)
-2. 각 검증자의 판정 결과 수집
-3. **불일치 식별**: 검증자 간 판정이 다른 항목 목록화
-4. **갈등 분석** (불일치 항목이 있을 때):
-   - 각 불일치에 대해 "어느 관점이 더 타당한가?" 추론
-   - 근거: 코드 증거(파일:라인), AC 원문, 패턴 기준 중 어느 것에 기반하는지 명시
-5. **판정 근거 작성**: 최종 판정에 대해 "왜 이 결정을 내렸는지" 기록
-6. 빌드 결과 + 검증자 판정을 종합하여 최종 판정 도출
-
-> 리더(메인 세션)는 숙의 시 검증자들의 근거를 비교·분석하여 채택합니다. 자체 코드 평가 의견을 추가하지 않습니다.
-
-**숙의 결과 보고 형식**:
-```
-[숙의 결과]
-  빌드: PASS
-  일치 항목: AC-1(PASS), AC-3(PASS), ...
-  불일치 항목:
-    - AC-2: 검증자-AC(PASS) vs 검증자-패턴(FAIL) → 채택: FAIL
-      근거: ErrorHandler.wrap() 패턴 미사용 (src/handler.ts:45)
-  판정 근거: AC-2 패턴 불일치로 REWORK 판정
-```
-
----
-
-#### 3단계: 결과 종합
-
-| 검수 주체 | 역할 | 특성 |
-|----------|------|------|
-| **메인 세션** | 오케스트레이터 | 빌드 실행 + 팀 구성 + 숙의 (코드 평가 안 함) |
-| **검증 팀원 A** | 독립 평가자 A | design + diff 기반, 편향 없음 |
-| **검증 팀원 B** | 독립 평가자 B | design + diff 기반, 편향 없음 |
-| **리뷰어 (구현 팀)** | 참고 | 구현 중 상시 리뷰 결과 (있는 경우) |
-
-> 구현 단계에서 에이전트팀을 사용한 경우, 리뷰어의 리뷰 결과도 참고로 반영합니다.
-
-**최종 판정**:
-- 빌드 PASS + 검증자 전원 통과 → 작업 완료
-- 빌드 FAIL → 즉시 REWORK (검증 팀 spawn 불필요)
-- 검증자 일부 실패 → 실패 항목 정리 → 수정 후 재검수
-- 요구사항/설계 자체 문제 → 사용자에게 재검토 요청 → clarify부터 재진행
-
-### L 규모: 전체 검수
-
-M 규모의 모든 단계를 포함하며, 에이전트팀 검증자에게 추가 검증 항목을 부여합니다:
-
-1. **아키텍처 영향 검토**: 모듈 간 의존성 변경, API 계약 변경이 설계대로 반영되었는가?
-2. **변경 전파 체인 검증**: `.forge-flow/config.json`의 `propagation_chain` 필드 기반으로, 전파 대상이 모두 변경되었는가?
-3. **AC 전수 검사**: 모든 AC를 코드 위치(파일:라인)와 1:1 대응시켜 검증
-
-> L 규모에서는 에이전트팀으로 **관점별 복수 검증자 구성이 필수**입니다. 위 추가 항목은 검증자 프롬프트의 검증 항목에 포함하여 위임합니다.
-
-## 품질 게이트
-
-| 등급 | 기준 | 조치 |
-|------|------|------|
-| **통과**(PASS) | 전 항목 통과 | 수렴 검증 → 확정 |
-| **주의**(CONCERNS) | 경미한 이슈 (코딩 스타일 등) | `AskUserQuestion`으로 판단 위임 |
-| **재작업**(REWORK) | AC 미충족, 패턴 불일치 등 | 해당 부분 수정 → 재검수 |
-| **실패**(FAIL) | 근본적 문제 | 이전 단계부터 재검토 |
-
-> **누적 재작업(`rework_lifetime.verify`) 3회 도달 시 에스컬레이션** (상세: 아래 "에스컬레이션" 절).
-
-### 수렴 검증 (Convergence Verification)
-
-PASS 판정 후, 새로운 검증자를 spawn하여 확인 라운드를 수행합니다. 이전 검증자와 다른 독립 프로세스가 동일 범위를 재검증합니다.
-
-**설정 확인** (최초 진입 1회만):
-verify 최초 진입 시 design 문서의 `## 검증 설정` 섹션에서 현재 설정을 읽고 표시합니다:
-```
-[검증 설정 확인]
-  검증 강도: 강화 (2)
-  수렴 라운드: 2회
-  변경하시겠습니까? [Y/n]
-```
-변경 요청 시 해당 값을 수정하고 design 문서도 갱신합니다. **REWORK 후 재진입 시에는 묻지 않습니다.**
-
-**수렴 상한 확인**: design 문서의 `## 검증 설정` 섹션에서 `수렴 라운드` 값을 읽습니다.
-- 미설정이면 규모 기반 기본값 적용: **S=1, M=1, L=2**
-- S 규모는 수렴 1회 고정 (plan 4-B 설정과 무관). S규모는 강도 무관 **검증자 최대 1명**.
-
-**목적**: 단일 라운드에서 놓친 이슈를 포착. 검증자마다 관점이 다르므로, 0건이 나올 때까지 반복해야 신뢰도가 확보됩니다.
-
-**수렴 검증 흐름**:
-1. 에이전트팀 PASS 판정 후, 상태 파일의 `convergence_round` 확인 (없으면 0)
-2. `convergence_round` < `convergence_max`인 동안 반복:
-   a. 새 검증자 팀 전체 교체 spawn (기존 팀과 별도, 이전 라운드 결과 전달 금지)
-      - S 규모: 새 검증자 1명 직접 spawn (TeamCreate 없음)
-      - M/L 규모: 새 팀 구성 (검증 강도에 따른 인원)
-   b. 새 팀이 동일 scope(빌드 결과 + design + diff)를 독립 검증
-   c. **0건** → `convergence_round` += 1 → 수렴 확정 → 최종 PASS (반복 조기 종료)
-   d. **이슈 발견** → REWORK 처리 (`convergence_round` **유지**, 리셋 안 함) → 수정 → verify 재실행 → 다시 PASS 후 같은 라운드에서 새 팀 재검증
-3. 상한 도달 시 → AskUserQuestion: "수렴 상한({convergence_max}회)에 도달했습니다." / "계속 수렴" / "현재 상태로 진행"
-   - "계속" → `convergence_max` += 1, 다음 라운드 진행
-   - "진행" → 최종 PASS 확정
-
-> 수렴 검증에서 발견된 이슈는 `rework_counts.verify` **및** `rework_lifetime.verify`에 모두 포함됩니다.
-> 수렴 검증자 프롬프트에 이전 라운드 결과를 전달하지 않습니다 (독립 판단 보장).
-> 각 수렴 라운드는 검증자 팀 전체를 새로 교체합니다 (동일 팀 재사용 금지).
-> **REWORK 시 convergence_round 유지** — 같은 라운드에서 이슈 해결 후 재검증. 0건 확인 후에만 round++.
-
-**주의 판정 시 AskUserQuestion 호출**:
-```
-question: "경미한 이슈가 발견되었습니다. 어떻게 진행할까요?"
-header: "주의"
-options:
-  - label: "수용 — 진행 (Recommended)"
-    description: "경미한 이슈를 인지하고 다음 단계로 진행합니다"
-  - label: "수정 후 재검수"
-    description: "이슈를 수정한 뒤 verify를 다시 실행합니다"
-multiSelect: false
-```
-
-**재작업 처리 흐름 (debug-gate 포함)**:
-
-1. 문제점을 사용자에게 보고 (수정 필요한 파일과 내용 명시)
-2. **debug-gate — 루트코즈 조사** (증상 패치 방지):
-   - **Phase 1 체크리스트** (모두 완료해야 수정 착수):
-     - [ ] 에러 메시지/검증자 피드백을 정확히 읽었는가?
-     - [ ] 문제를 재현할 수 있는가? (테스트 또는 수동)
-     - [ ] 관련 변경사항을 확인했는가? (git diff)
-     - [ ] 데이터/제어 흐름을 추적했는가?
-   - **루트코즈 가설 기록**: 추정 원인을 1문장으로 기록
-   - **최소 변경 원칙**: 가설에 대한 단일 최소 수정만 적용
-3. **rework-log 기록** (아래 규칙 참조) — 루트코즈 가설 포함
-4. 상태 파일 카운터 갱신:
-   - `rework_counts.verify` +1 (PASS 시 리셋되는 라운드 내 카운터)
-   - `rework_lifetime.verify` +1 (리셋 없는 전체 누적 카운터, 에스컬레이션 기준)
-   - `convergence_round` **유지** (리셋 안 함 — 같은 라운드에서 재검증)
-5. phase를 `"implementing"`으로 되돌림
-6. 코드 수정 (루트코즈 가설 기반 단일 수정)
-7. 수정 완료 후 `/forge-flow:verify` 재호출
-
-**전역 재작업 상한 (게이트 간 핑퐁 방지) — 가장 먼저 검사**:
-- 게이트별(verify/test) 에스컬레이션은 단일 게이트의 누적만 본다. verify↔test↔implement 핑퐁(verify PASS 후 test REWORK → 재구현 → verify 재진입 시 `rework_counts.verify`==0이라 최초 진입으로 재판단)으로 **per-gate 카운터가 리셋되며 무한 왕복**할 수 있다. 이를 막기 위해 전역 합산 상한을 둔다.
-- **전역 누적** = `rework_lifetime.verify` + `rework_lifetime.test` (모든 `rework_lifetime.*` 키 합산). `rework_lifetime.*`는 어떤 경우에도 리셋되지 않으므로 핑퐁 총량을 정확히 반영.
-- **전역 상한 = 6.** 전역 누적이 6 이상이면 per-gate ≥3 검사보다 **우선하여** 설계 수준 에스컬레이션:
-  - 사용자에게 보고: "이 작업의 게이트 간 전역 누적 REWORK가 {합산값}회입니다 (verify {n}, test {m}). 게이트 사이를 반복 왕복 중이며, 증상 수정이 아닌 요구사항/설계 수준 재검토가 필요합니다."
-  - `AskUserQuestion`: "clarify 재진입 — 요구사항부터 재검토 (Recommended)" / "현재 게이트에서 계속 진행"
-  - **"clarify 재진입" 선택 시**: phase를 `"clarifying"`으로 전이, `rework_counts` 전체 리셋 (`rework_lifetime`은 유지 — 전역 상한 추적 지속).
-  - **"계속" 선택 시**: 아래 per-gate 에스컬레이션으로 진행. (전역 상한은 유지되므로 다음 REWORK에서 다시 검사됨)
-- test SKILL의 REWORK 처리도 동일하게 본 전역 상한을 먼저 검사한다.
-
-**per-gate 에스컬레이션 (`rework_lifetime.verify` ≥ 3)** — 전역 상한 미달 시:
-- `rework_lifetime.verify` ≥ 3이면 아키텍처 재검토 플래그를 설정
-- 사용자에게 보고: "이 작업에서 누적 REWORK가 {rework_lifetime.verify}회입니다. 증상 수정이 아닌 설계 수준 재검토가 필요할 수 있습니다."
-- `AskUserQuestion`: "아키텍처 재검토 후 재시도" / "FAIL로 에스컬레이션 (clarify 재진입)"
-- **"재시도" 선택 시**: `rework_counts.verify`를 0으로 리셋 (`rework_lifetime.verify`는 유지), phase를 `"implementing"`으로 전이.
-- **"FAIL" 선택 시**: phase를 `"clarifying"`으로 전이, `rework_counts` 전체 리셋 (`rework_lifetime`은 유지).
+→ 사용자 입력 없이 **즉시 `/forge-flow:test` 호출** (test 스킵조건이면 자동 스킵 → complete).
 
 ## Rework Log 관리
 
-REWORK 판정 시 `.forge-flow/rework-log.md`에 패턴을 기록합니다. clarify/plan에서 이 로그를 참조하여 동일 실수를 예방합니다.
+> verify/test/complete가 공통 참조하는 규칙(test SKILL "rework-log 기록"·complete 회고가 본 절을 가리킴). REWORK 판정 시 `.forge-flow/rework-log.md`에 패턴 기록 → clarify/plan이 참조해 동일 실수 예방.
 
-**기록 절차**:
-1. `.forge-flow/rework-log.md` 읽기 (없으면 생성)
-2. 기존 항목과 **유사 패턴** 검색 (같은 원인 유형)
-3. 유사 패턴 있으면 → 카운트 +1, 날짜 갱신
-4. 새 패턴이면 → 항목 추가
-5. **정리**: 추가 후 아래 관리 규칙 적용
+**기록 절차**: ① 로그 읽기(없으면 생성) → ② 유사 패턴(같은 원인 유형) 검색 → ③ 있으면 카운트 +1·날짜 갱신 / 없으면 새 항목 추가 → ④ 관리 규칙 적용.
 
 **항목 형식**:
 ```markdown
 ## {원인 요약} (×{횟수}) [{차원}]
-- 최근: {날짜} | {verify/test}
-- 파일: {관련 파일}
+- 최근: {날짜} | {verify/test/review-req/review-plan}
+- 파일: {관련 파일 또는 design 섹션}
 - 교훈: {재발 방지 핵심 한 줄}
 <!-- first: {최초 발생일} -->
 ```
 
-> **차원 태그**: `[코드]`, `[평가]`, `[프로세스]`, `[요구사항]`, `[환경]` 중 하나를 항목 제목 끝에 명시합니다.
-> - `[코드]`: 구현 코드의 실수 (패턴 미준수, 로직 오류 등) — verify/test REWORK 시 기본값
-> - `[평가]`: 검증자/테스터의 오판 패턴 (기준 불일치, 놓친 항목 등) — verify/test 숙의에서 기록
-> - `[프로세스]`: 워크플로 프로세스 비효율 (팀 구성 오류, 커뮤니케이션 누락 등) — complete 회고에서 기록
-> - `[요구사항]`: 요구사항 해석 오류 (모호한 AC가 검수까지 전파 등) — complete 회고에서 기록
-> - `[환경]`: 환경/도구 제약 (로컬 vs CI 차이, 타이밍 이슈 등) — test 숙의에서 기록
+**차원 태그** (제목 끝 1개 명시). 소비자(재유입) 2계층:
+- **clarify**(요구사항 단계): `[코드]`·`[요구사항]`만 선별 스캔 → AC/주의사항 재유입 (요구 관련 차원만).
+- **plan**(계획 단계): `전체 차원` 스캔(plan SKILL §1단계) → 구현계획 주의/리스크 재유입. `[계획]` 포함 모든 차원이 여기서 소비됨(고아 차원 없음).
 
-**관리 규칙**:
-- 최대 **15건** 유지 — 초과 시 카운트(×N)가 가장 낮은 항목부터 삭제, 동일 카운트 시 오래된 날짜 순 삭제
-- 단발성(×1) 항목은 **60일** 경과 시 삭제
-- 반복 패턴(×2+)은 TTL 무관 유지
-- TTL 규칙은 차원 무관 동일 적용
+차원 목록(작성자 → 소비자):
+- `[코드]`: 구현 코드 실수 — verify/test REWORK 기본값 → clarify·plan
+- `[평가]`: 검증자/테스터 오판 — 숙의/refute에서 기록 → plan
+- `[프로세스]`: 워크플로 비효율 — complete 회고 → plan
+- `[요구사항]`: 요구사항 해석·AC 결함 — **review-req REWORK** + complete 회고 → clarify·plan
+- `[계획]`: 구현계획 결함(전파누락·순서역전·범위침범) — **review-plan REWORK** (v5 신규 차원) → **plan**(전체차원 스캔이 소비)
+- `[환경]`: 환경/도구 제약 — test 숙의 → plan
 
-## 검수 결과 기록
+**관리 규칙**: 최대 15건(초과 시 ×N 최저·동수면 오래된 날짜 순 삭제) / ×1 단발성은 60일 TTL / ×2+ 반복은 TTL 무관 유지.
 
-design 문서의 `## 검수 결과` 섹션에 요약 기록, 상세 이력은 `.forge-flow/design/{task_id}.review.md`에 기록:
+---
 
-**design 문서** (`## 검수 결과`):
-```markdown
-## 검수 결과
-- verify: PASS (2026-03-13)
-```
+## v5 변경 요약 (기존 대비)
 
-**{task_id}.review.md** (상세 이력 — 누적):
-```markdown
-### verify
-- #1 REWORK: 기존 ErrorHandler 패턴과 불일치
-  → 수용: try-catch → ErrorHandler.wrap() 패턴으로 변경
-- #2 PASS
-```
+| 항목 | 기존 | v5 |
+|------|------|-----|
+| 검증자 spawn | TeamCreate+Agent 산문 ~3K줄 | `workflows/verify.js` Workflow |
+| 수렴 | 산문 루프 지시 | 스크립트 `while round<max` (의미 재정의, §3) |
+| 적대적 확정 | 없음 | finding당 N명 refute, **엄격 과반 반박만 폐기 + 불확실=결함유지**(게이트 역방향) — 신규 |
+| 숙의 | 메인이 불일치 수동 분석 | 스크립트 병렬 + 확정 집계 |
+| 상태/CONCERNS/빌드 | 메인 | **메인 유지** (seam 불변) |
 
-## 상태 파일 갱신 (완료 시)
+## 파일럿이 측정하는 것 (범위 한정)
 
-PASS 시 (수렴 완료):
-```json
-{
-  "phase": "verified",
-  "stop_count": 0,
-  "rework_counts": { "verify": 0 },
-  "rework_lifetime": { "verify": "<누적값 유지>" },
-  "convergence_round": "<최종 라운드 번호>"
-}
-```
-
-REWORK 시:
-```json
-{
-  "phase": "implementing",
-  "rework_counts": { "verify": "<+1>" },
-  "rework_lifetime": { "verify": "<+1>" },
-  "convergence_round": "<현재 라운드 유지>"
-}
-```
-
-FAIL 시:
-```json
-{
-  "phase": "clarifying",
-  "rework_counts": { "verify": 0 },
-  "rework_lifetime": { "verify": "<누적값 유지>" },
-  "convergence_round": 0
-}
-```
-
-> REWORK/FAIL로 인한 후퇴 시 `stop_count`를 리셋하지 않습니다.
-> `rework_lifetime.verify`는 어떤 경우에도 리셋하지 않습니다 (작업 전체 누적값).
-> REWORK 시 `convergence_round` 유지 — 같은 라운드에서 수정 후 재검증.
-> FAIL 시 `convergence_round` 0으로 리셋.
-
-## 완료 후 다음 단계
-
-verify PASS 후 → 사용자의 추가 입력 없이 **즉시 `/forge-flow:test`를 호출**합니다.
-
-> `/forge-flow:test`에서 스킵 조건에 해당하면 자동으로 스킵되므로, verify는 항상 test를 호출합니다.
-
-> 완료된 작업의 스펙과 검수 이력은 커밋 메시지와 코드에 반영되어 있으므로 별도 보존 불필요.
-> test 스킵 시 (S규모 + UI AC 없음), test를 거치지 않고 **즉시 `/forge-flow:complete`를 호출**합니다.
+- ✅ **측정**: 스킬 지시 → 모델이 Workflow를 신뢰성 있게 발동하나 / scriptPath 경로해결 / schema verdict 왕복 / 상태기록 seam.
+- ❌ **측정 안 됨**: verify는 **읽기전용** → worktree 변경+머지 검증 불가. **build-via-Workflow 결정규칙의 기준 ②는 이 파일럿으로 입증 안 됨.** verify 통과해도 build=Workflow 확정 아님 (별도 쓰기 파일럿 필요).

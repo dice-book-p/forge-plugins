@@ -1,434 +1,139 @@
 ---
 name: review-req
-description: "요구사항 검수 — clarify 완료 후 design 문서의 품질을 에이전트팀 교차검증으로 검수합니다. design 파일 생성 직후 자동 활성화."
+description: "요구사항 검수 — Workflow 외부검수(관점 fan-out + completeness critic + 적대적 확정). design 파일 생성 직후 자동 활성화."
 ---
 
-clarify에서 작성된 design 문서의 요구사항 품질을 에이전트팀 교차검증으로 검수합니다.
+> **v5 파일럿 드래프트.** 기존 SKILL.md(에이전트팀 산문 ~17K, TeamCreate)를 Workflow 호출로 대체. 라이브 교체 전 검토용.
+> **충실도 주의**: verdict/관점독립성/seam 보존. 단 **구 `rework_counts.review-req >= 3 → FAIL` 에스컬레이션은 폐기** — `rework_lifetime` 통일 기준(§7)으로 대체. 구 카운터 산문 복제 금지.
+> **수렴 루프 없음**: design은 정적 산출물 — 단일패스 검증. 수정은 하네스에서(사용자 design 편집 후 재실행).
+> **규모**: 파일럿은 **conservative-first** (관점 = 워크플로 규모기본 S1/M3/L4). 발동 신뢰성 입증 후 `aggressive` 켜서 budget 연동 증원.
 
-## 실행 조건
+clarify에서 작성된 design 문서의 **요구사항 품질**을 검증. 메인은 Workflow 오케스트레이션 + verdict 라우팅만, design 평가는 Workflow 검증자에 위임.
 
-- **S/M/L 모두** 항상 실행 (규모에 관계없이)
-- .forge-flow/design/{작업명}.md 파일이 존재해야 함
-- 없으면 → `/forge-flow:clarify` 먼저 실행 안내
-
-## 선행 조건 검사
-
-실행 전 반드시 확인:
-1. 현재 세션에 바인딩된 상태 파일 탐색 → `.forge-flow/state/`에서 `session_id`가 현재 세션(`${CLAUDE_SESSION_ID}`)과 일치하는 `{task_id}.json` 파일 탐색 → 없으면: "워크플로가 시작되지 않았습니다. `/forge-flow:clarify`로 시작하세요."
-2. `design_file`이 존재하는 파일 경로인지 확인 → 없으면: "설계 문서를 찾을 수 없습니다. `/forge-flow:clarify`를 먼저 실행하세요."
-
-## 상태 파일 갱신
-
-실행 시작 시:
-```json
-{ "phase": "reviewing-req", "stop_count": 0, "rework_counts": { "review-req": 0 } }
-```
-
-> **rework_counts 독립 추적**: `rework_counts.review-req`를 사용합니다.
-> 최초 진입 판단: `rework_counts.review-req`가 0 (또는 미존재)이면 최초 진입 → 0으로 초기화. `rework_counts.review-req > 0`이면 REWORK 후 재진입 → 유지.
-> 이 규칙으로 REWORK 후 phase가 `"clarifying"`으로 돌아갔다가 재실행되어도 카운터가 보존됩니다.
-
-## 실행 흐름
-
-### 1단계: design 문서 로드
-
-상태 파일의 `design_file` 경로에서 design 문서를 읽습니다.
-
-### 2단계: 교차검증
-
-### 규모별 에이전트팀 구성
-
-아래 의사결정 트리로 팀 규모를 결정합니다:
-
-```
-S   → 에이전트팀 1명 (통합 검증)
-M   → 에이전트팀 (기본 관점별 구성)
-L   → 에이전트팀 (기본 관점 + 변경 전파 체인 검증)
-```
-
-### 검증 관점 결정 (공통)
-
-팀 구성 전, design 문서와 CLAUDE.md를 참조하여 적용할 검증 관점을 결정합니다:
-
-1. **기본 관점**: 완전성, 실현성, 일관성 (항상 포함)
-2. **프로젝트 관점**: CLAUDE.md `### 프로젝트 검증 관점` 테이블에서 `적용 단계`에 `review-req`가 포함된 관점을 읽음. **섹션 없으면 기본 관점만 사용** (폴백)
-3. **작업 관점**: design 문서 `## 검증 관점`에서 활성화된 프로젝트/작업 특화 관점 확인
-
-> 전체 검증자 수 상한: **최대 5명**. 기본 3 + 프로젝트/작업 관점 합산 시 5명 초과하면 아래 우선순위로 통합 배정:
-> 1. **작업 특화 관점** → 가장 관련성 높은 기본 관점에 통합 (예: "데이터 정합성" → 완전성에 통합)
-> 2. **프로젝트 관점** → 관련 기본 관점에 통합 (예: "보안" → 실현성에 통합)
-> 3. 그래도 초과 시 → 프로젝트 관점 중 AC 연관도가 낮은 것부터 제외
+> **하네스 원칙**: 생산자 ≠ 평가자. 메인(clarify에서 design 작성)은 오케스트레이터, design 직접 평가 안 함.
 
 ---
 
-**A. S 규모 — 에이전트팀 통합 검증**
+## 1. 선행 조건 검사 (메인)
 
-에이전트팀 1명(통합 검증자)을 spawn하여 독립 검증합니다.
+1. 세션 바인딩 상태파일 탐색 (`.forge-flow/state/`에서 `session_id` == `${CLAUDE_SESSION_ID}`인 `{task_id}.json`) → 없으면 "워크플로 미시작. `/forge-flow:clarify`로 시작."
+2. `design_file` 존재하는 파일 경로 → 없으면 "설계 문서 없음. `/forge-flow:clarify`를 먼저 실행."
+3. `phase` ∈ {`clarifying`, `reviewing-req`} → 아니면 "현재 {phase} 단계. clarify 완료 후 review-req."
 
-**에이전트팀 spawn 절차**:
+> **실행 조건**: S/M/L 모두 항상 실행 (규모 무관).
 
-1. **`TeamCreate` 호출**: `{ "team_name": "review-req-{task_id}", "description": "요구사항 검증 팀" }`
-2. **`TaskCreate`로 검증 작업 생성**: 통합 검증 작업 1건
-3. **`Agent` 도구 + `team_name` + `name` + `model: "sonnet"` 파라미터로 팀원 spawn**
-4. 팀원 메시지 자동 수신 → `SendMessage`로 종료 → `TeamDelete`
+## 2. 상태파일 갱신 (시작)
 
-| 역할 | 책임 |
-|------|------|
-| **통합 검증자** | AC 검증 가능성 + 영향도 파악 + 엣지케이스 확인 + 모호성 검증 + (프로젝트 관점 1개, 해당 시) |
-
-> S규모 프로젝트 관점: design 문서 `## 검증 관점`에서 프로젝트 관점이 있으면 **가장 관련성 높은 1개��** 통합 검증자 프롬프트에 포함. 2개 이상이면 AC와의 연관도가 가장 높은 것을 선택.
-
-**검증 팀 구성 보고**:
-```
-[검증 팀 구성 — 에이전트팀]
-  team: review-req-{task_id}
-  통합 검증자: AC 검증 가능성 + 영향도 + 엣지케이스 + 모호성/모순
-
-검증 팀을 spawn합니다.
-```
-
-**검증자 프롬프트 템플릿** (`model: "sonnet"`):
-```
-당신은 {프로젝트명}의 ���립 요구사항 검증자입니다.
-
-## 프로젝트 컨텍스트
-{CLAUDE.md에서 기술 스택, 빌드 명령, 프로젝트 구조 요약 — 3줄 이내}
-
-## design 문서
-{design 문서 전문}
-
-## 검증 항목
-1. **AC 검증 가능성**: 각 AC가 코드로 검증 가능한 구체적 조건인가?
-2. **모호성**: AC 표현이 2가지 이상으로 해석될 여지가 있는가?
-3. **영향도 파악**: 기존 코드와의 영향 범위가 충분히 식별되었는가?
-4. **누락된 엣지케이스**: 경계값, null/empty, 실패 경로 등 고려 누락은 없는가?
-5. **{프로젝트 관점}**: {프로젝트 관점 설명 기반 검증 항목} (해당 시)
-
-## 응답 원칙
-- PASS 항목은 한 줄로 요약 (상세 불필요)
-- FAIL 항목만 상세히: 문제 + 개선 제안
-- 전체 응답 2,000 토큰 이내 권장
-
-## 응답 형식
-각 항목에 대해:
-- PASS: <근거 한 줄>
-- FAIL: <구체적 문제점 + 개선 제안>
-
-## 종합 판정
-PASS / CONCERNS / REWORK / FAIL + 근거
-```
-
-> **핵심 원칙**: 메인 세션의 판단 결과를 검증 팀원에게 전달하지 않음 (독립 판단 보장).
-
-**상태 파일 (팀 활성화 시)**:
 ```json
-{
-  "phase": "reviewing-req",
-  "agent_team": {
-    "enabled": true,
-    "members": [
-      {"role": "validator", "scope": "통합", "status": "active"}
-    ]
+{ "phase": "reviewing-req" }
+```
+카운터 의미 (verify/test와 통일):
+- `rework_counts.review-req`: 라운드 내 REWORK 횟수. PASS/재시도 시 0 리셋. (라운드/재진입 마커)
+- `rework_lifetime.review-req`: 작업 전체 누적(리셋 없음). **에스컬레이션 단일 기준**.
+
+최초 진입 판단: `rework_counts.review-req`==0(또는 미존재) → 최초(0 세팅). `>0`이면 REWORK 후 재진입 → 유지.
+
+## 3. 검증 설정 읽기 (메인)
+
+design `## 검증 설정`에서:
+- **검증 강도**(=관점/검증자 수): 미설정 시 워크플로 규모기본 S=1 / M=3 / L=4. 최소 1.
+- 최초 진입 1회만 `AskUserQuestion`으로 변경 여부 확인. REWORK 재진입 시 안 물음.
+
+> **수렴 없음**: design은 정적 산출물 — 관점 fan-out + completeness critic 단일패스 → 적대적 확정 → verdict. 반복은 하네스(사용자 design 수정 후 재호출)에서.
+
+## 4. Workflow 호출 (외부 검수)
+
+`workflows/review-req.js`를 **Workflow 도구로 호출**한다.
+
+> **scriptPath 절대경로 해결 (필수)**: SKILL.md 본문의 `${CLAUDE_PLUGIN_ROOT}`는 모델이 읽는 마크다운/셸 환경 모두에서 확장 보장 안 됨. cold 세션에선 스킬 파일 절대경로도 안 주어짐. 아래 순서로:
+> 1. **(권장) glob**: `ls -d ~/.claude/plugins/marketplaces/*/forge-flow/workflows/review-req.js` → 정확히 1개면 그 경로. 프로젝트-로컬 대비 `.claude/plugins/marketplaces/*/forge-flow/workflows/review-req.js`도 확인. **0개**: 미설치 보고·중단. **2개+**: 설치 마켓플레이스 일치 우선, 모호하면 사용자 확인.
+> 2. **(캐시) `.forge-flow/config.json`의 `plugin_root`**: 존재 시 `<plugin_root>/forge-flow/workflows/review-req.js`. 1번 결과를 여기 1회 기록해두면 재사용.
+
+> **🔴 disk>diff 요건 (advisor, 검증자 디스크 직접 Read)**: review-req 검증자(실현성/전파 관점)는 design 검증 중 **저장소 파일을 직접 읽어** 실현성·영향범위를 확인한다. 따라서 **반드시 워크플로 cwd=대상 repo이거나, `projectContext`에 대상 repo 절대 루트를 명시**해야 한다(아래 args처럼). 누락 시 에이전트가 경로를 탐색하다 home cwd FS 크롤 폭주 → 타프로젝트 환각 재발(과거 namdomarket AC-9 사고). 정적 design만으로 판정 가능한 관점(완전성/일관성)은 designDoc 텍스트로 충분하나, 절대 루트는 항상 주입한다.
+
+```
+Workflow({
+  scriptPath: "<해결한 절대경로>/workflows/review-req.js",
+  args: {
+    taskId, scale,                       // 상태파일
+    strength,                            // §3 검증설정 (미설정 시 워크플로 규모기본)
+    projectContext: "<CLAUDE.md 스택/구조 요약 ≤3줄 + '대상 저장소 루트=<절대경로>'>",
+    designDoc: "<design 문서 전문 — 검증 대상 정적 산출물>",
+    reworkLogExcerpt: "<rework-log 과거 요구 결함 패턴 발췌, 없으면 ''>"
   }
-}
+})
 ```
 
----
+> **이 스킬은 위 Workflow를 반드시 호출한다** (opt-in 충족: 스킬 지시문 경로).
+> Workflow는 판정만 반환 — 관점별 독립 검증자 + completeness critic 병렬 → dedup 배리어(동일 근본이슈 텍스트병합) → finding당 적대적 확정(엄격 과반 반박만 폐기, 불확실=결함유지) → verdict.
+> 완료 `<task-notification>` 수신 = verdict 도착 신호.
 
-**B. M 규모 — 에이전트팀 교차검증**
+## 5. Workflow throw 처리 (wiring 버그 ≠ content REWORK) — 신규
 
-에이전트팀으로 검증 팀을 구성합니다. 각 검증자는 독립 Claude Code 프로세스로 실행됩니다.
+**인식 신호 (실측 wf_8c313ee9)**: Workflow throw는 완료 `<task-notification>`에서 **`<status>failed</status>`**(≠`completed`) + `<summary>`에 `… failed: Error: <원문>`로 표면화된다. `<result>`의 `verdict` 필드는 없다. (fail-fast = `agent_count 0`, ~5ms, FS 크롤 0 — 정상 차단.) 즉 **"status=failed 또는 verdict 필드 부재" = throw**, content verdict 아님.
 
-**에이전트팀 spawn 절차**:
+Workflow가 **에러로 종료**(throw)하면 — 예: `review-req: designDoc 미주입 …` / `args 파싱 실패 …` / scriptPath 해결 실패 — 이것은 **하네스 배선(wiring) 버그이지 design 결함이 아니다.**
 
-1. **`TeamCreate` 호출**: `{ "team_name": "review-req-{task_id}", "description": "요구사항 검증 팀" }`
-2. **`TaskCreate`로 검증 작업 생성**: 각 관점별 작업
-3. **`Agent` 도구 + `team_name` + `name` + `model: "sonnet"` 파라미터로 팀원 spawn**
-4. 팀원 메시지 자동 수신 → 숙의 → `SendMessage`로 종료 → `TeamDelete`
+- ❌ **rework 카운터 증가 금지**, phase 후퇴 금지, verdict 라우팅(§6) 진입 금지.
+- ✅ 에러 메시지로 원인 진단: `designDoc`/`scale`/`scriptPath` 등 **args 주입 누락**을 §4 계약대로 교정 → **같은 단계 재호출**.
+- ✅ 2회 연속 throw면 사용자에게 배선 오류 보고(메시지 원문 첨부) 후 중단. design 품질과 무관함을 명시.
 
-**기본 관��** (M 규모):
+> 근거: 워크플로는 fail-fast(`if(!A.designDoc) throw`)로 FS 크롤 폭주를 차단한다. throw를 content REWORK로 오인하면 멀쩡한 design을 사용자에게 수정하라고 잘못 안내하게 됨.
 
-| 역할 | 책임 |
-|------|------|
-| **review-req-완전성** | AC 누락·모호성 검증, 각 AC가 코드로 검증 가능한 구체적 조건인���, 엣지케이스 누락 |
-| **review-req-실현성** | 기술적 실현 가능성, 기존 코드와의 영향 범위 누락 여부 |
-| **review-req-일관성** | 요구사항 간 모순·충돌, 제외 범위와 변경 범위 간 모순 (모호성은 완전성이 담당 — ���복 방지) |
+## 6. verdict 라우팅 (메인)
 
-**관점 경계 규칙**:
-- **모호성** (해석이 2가지+ 가능한 항목) ��� **완전성**이 전담
-- **모순** (요구사항 간 충돌, 제외/변경 범위 간 충돌) → **일관성**이 전담
-- 각 검증자는 자신의 관점에서 독립 검증하며 다른 관점과의 중복을 고���하지 않음
+Workflow 반환 `{ verdict, findings, rework, concerns }` 해석 (verify와 동일 어휘 — **PASS/CONCERNS/REWORK만**; FAIL은 워크플로가 아니라 §7 하네스 에스컬레이션 결과):
 
-**프로젝트 관점 추가** (��당 시): design 문서 `## 검증 관점`에서 활성화된 프로젝트/작업 관점��� 기존 검증자에게 통합 배정하거나, 별도 팀원으로 추가. 전체 검증자 수 **최대 5명**.
+| verdict | 조치 |
+|---------|------|
+| **PASS** | §8 PASS 상태 기록 → AskUserQuestion 확인 → `/forge-flow:plan` |
+| **CONCERNS** | `AskUserQuestion`("경미 이슈, 수용 진행 / 수정 후 재검수") — **비차단**. 수용=PASS 처리(plan 진행), 수정=REWORK 처리 |
+| **REWORK** | §7 REWORK 처리 |
 
-> 역할은 프로젝트와 작업에 따라 **동적으로 결정**합니다. 위는 기본 구성이며, 프로젝트 관점에 따라 팀원이 추가될 수 있습니다.
+> Workflow는 `Date.now()`/사용자대화 불가 → CONCERNS 사용자판단·상태쓰기는 **메인이** 수행 (seam 계약).
 
----
+## 7. REWORK 처리 (메인)
 
-**C. L 규모 — 에이전트팀 교차검증 (강화)**
+design은 정적 산출물 → REWORK = **사용자가 design을 수정한 뒤 재검수**.
 
-M 규모 기본 관점에 더해, L 규모에서�� 다��� 관점을 추가합니다:
+1. 문제점 보고 (`findings`의 design 섹션/AC id + fix).
+2. `rework-log.md` 기록 (차원 태그 `[요구사항]` — clarify 재유입 스캔 어휘와 일치).
+3. 카운터: `rework_counts.review-req`+1, `rework_lifetime.review-req`+1.
+4. phase → `clarifying`. `stop_count` 리셋 안 함.
+5. 사용자에게 design 수정 안내 → 수정 후 `/forge-flow:review-req` 재호출.
 
-| 추가 역할 | 책임 |
-|----------|------|
-| **review-req-전파** | 변경 전파 체인 검증 — 영향 받는 모듈/서비스 간 연쇄 영향이 AC에 반영되었는가 |
+**에스컬레이션 — ① 전역 상한 먼저, ② per-gate** (verify/test와 통일):
+- **① 전역 상한**: 모든 `rework_lifetime.*` 합산 ≥ **6**이면 per-gate보다 우선. 보고 + `AskUserQuestion`: "clarify 재진입 — 요구사항부터 재검토 (Recommended)" / "현재 게이트 계속". clarify 재진입 → phase=`clarifying`, `rework_counts` 리셋(`rework_lifetime` 유지).
+- **② per-gate (`rework_lifetime.review-req` ≥ 3)** — 전역 미달 시: 보고 + `AskUserQuestion`: "요구사항 재검토 후 재시도" / "FAIL로 에스컬레이션".
+  - 재시도 → `rework_counts.review-req`=0, phase=`clarifying`.
+  - FAIL → phase=`clarifying`, `rework_counts` 리셋(`rework_lifetime` 유지), design 파일 유지한 채 clarify 재실행 안내.
 
-> L 규모는 ��향 범위가 ��으므로 전파 체인 검증이 필수입니다. M 규모에서는 실현성 검증자가 영향도를 커버합니다.
+> **구 규칙 폐기**: `rework_counts.review-req >= 3 → FAIL`(pre-7ff73c6)은 쓰지 않는다. 핑퐁이 per-gate 카운터를 리셋시키므로 **누적 `rework_lifetime`**으로만 에스컬레이션.
 
-spawn 절차, 프로젝트 관점 추가 규칙은 M 규모와 동일.
+## 8. 완료 상태 기록 + 다음 단계
 
----
-
-**검증 팀 구성 보고** (M 규모 예시):
-```
-[검증 팀 구성 — 에이전트팀]
-  team: review-req-{task_id}
-  review-req-완전성: AC 검증 가능성 + 모호성 + 엣지케이스
-  review-req-실현성: 기술적 실현 가능성 + 영향 범위
-  review-req-일관성: 요구사항 간 모순 + 제외 범위
-  (프로젝트 관점: 보안 — review-req-보안, 해당 시)
-
-검증 팀을 spawn합니다.
-```
-
-**검증자 프롬프트 템플릿** (`model: "sonnet"`):
-```
-당신은 {프로젝트명}의 독립 요구사항 검증자입니다.
-검증 관점: {담당 관점}
-
-## 프로젝트 컨텍스트
-{CLAUDE.md에서 기술 스택, 빌드 명령, 프로젝트 구조 요약 — 3줄 이내}
-
-## design 문서
-{design 문서 전문}
-
-## 검증 항목
-{담당 관점에 해당하는 구체적 검증 항목}
-
-## 응답 원칙
-- PASS 항목은 한 줄로 요약 (상세 불필요)
-- FAIL 항목만 상세히: 문제 + 개선 제안
-- 전체 응답 2,000 토큰 이내 권장
-- 자신의 관점에서 독립 검증 — 다른 관점과의 중복을 고려하지 않음
-
-## 응답 형식
-각 항목에 대해:
-- PASS: <근거 한 줄>
-- FAIL: <구체적 문제점 + 개선 제안>
-
-## 종합 판정
-PASS / CONCERNS / REWORK / FAIL + 근거
-```
-
-> **핵심 원칙**: 메인 세션의 판단 결과를 검증 팀원에게 전달하지 않음 (독립 판단 보장).
-
-**상태 파일 확장 (팀 활성화 시)**:
+PASS(또는 CONCERNS 수용):
 ```json
-{
-  "phase": "reviewing-req",
-  "agent_team": {
-    "enabled": true,
-    "members": [
-      {"role": "validator", "scope": "완전성", "status": "active"},
-      {"role": "validator", "scope": "실현성", "status": "active"},
-      {"role": "validator", "scope": "일관성", "status": "active"}
-    ]
-  }
-}
+{ "phase": "req-reviewed", "stop_count": 0,
+  "rework_counts": { "review-req": 0 },
+  "rework_lifetime": { "review-req": "<유지>" } }
 ```
+design `## 검수 결과`에 `- review-req: PASS (날짜)`, 상세는 `{task_id}.review.md` 누적.
 
-**검증 팀 결과 종합 — 숙의(Deliberation)** (리더):
-1. 모든 검증자의 메시지 자동 수신 대기 (팀원 idle 알림으로 완료 감지)
-2. 각 검증자의 판정 결과 수집
-3. **불일치 식별**: 검증자 간 판정이 다른 항목 목록화
-4. **갈등 분석** (불일치 항목이 있을 때):
-   - 각 불일치에 대해 "어느 관점이 더 타당한가?" 추론
-   - 근거: AC 원문, 기존 코드 구조, 기술적 제약 중 어느 것에 기반하는지 명시
-5. **판정 근거 작성**: 최종 판정에 대해 "왜 이 결정을 내렸는지" 기록
-6. 최종 판정 도출
-
-**숙의 결과 보고 형식**:
-```
-[숙의 결과]
-  일치 항목: 완전성(PASS), 일관성(PASS), ...
-  불일치 항목:
-    - 실현성: 검증자-실현성(FAIL) vs 검증자-완전성(PASS)
-      → 채택: FAIL — 기존 API 스키마와 충돌 가능성 (users.ts:12)
-  판정 근거: 실현성 이슈로 REWORK 판정, AC-3 영향 범위 재검토 필요
-```
+→ PASS 골격 보고 + `AskUserQuestion`("승인 — plan 진행 (Recommended)" / "재검토 — clarify부터"):
+- 승인 → **즉시 `/forge-flow:plan` 호출**.
+- 재검토 → phase=`clarifying`, clarify 재실행.
 
 ---
 
-### 3단계: 결과 종합
+## v5 변경 요약 (기존 대비)
 
-교차검증 결과를 종합하여 4단계 품질 게이트로 판정:
-
-#### 사용자 보고 출력 포맷 (표준)
-
-판정 결과를 사용자에게 보고할 때 **반드시 아래 골격을 사용**합니다. 목적은 작업자가 (1) 다음에 뭘 해야 하는지 (2) 이번 단계에서 확정된 의사결정이 자기 의도와 일치하는지 한눈에 보고 방향을 검토할 수 있게 하는 것.
-
-**공통 골격**:
-```
-[review-req] {판정} → {다음 액션}
-
-{블록 A: 작업자 액션 항목 — 0개면 "없음"}
-
-{블록 B: 핵심 결정 또는 차단 사유}
-
-세부 보기: "세부" 입력
-```
-
-**PASS**:
-```
-[review-req] PASS → 다음: plan ({모델})
-
-확인 필요 (N)
-  □ {작업자 결정/확인 필요 항목} — 너 결정
-  (또는 "없음")
-
-핵심 결정 (이번 단계 확정사항)
-  · {확정된 AC/설계 결정 한 줄}
-  · ...
-
-세부 보기: "세부" 입력
-```
-
-**CONCERNS**:
-```
-[review-req] CONCERNS → 다음: plan 진행 가능 (해결 후)
-
-미해결 (N)
-  ⚠ {경미한 이슈 한 줄}
-
-핵심 결정 (확정)
-  · {확정된 AC/설계 결정}
-
-세부 보기: "세부" 입력
-```
-
-**REWORK**:
-```
-[review-req] REWORK → 차단, design 수정 후 재검수 ({n}/3회)
-
-차단 사유 (N)
-  ✗ {수정 필요 항목 한 줄}
-
-세부 보기: "세부" 입력
-```
-
-**FAIL**:
-```
-[review-req] FAIL → 차단, clarify 재실행
-
-차단 사유 (N)
-  ✗ {근본 문제 한 줄}
-
-세부 보기: "세부" 입력
-```
-
-**작성 규칙**:
-- 한 줄 = 작업자가 1~2초 안에 읽을 수 있는 길이. AC 번호/파일경로 포함, 검수자 내부 로그 표현 금지.
-- "확인 필요"/"미해결"/"차단 사유"는 검증자가 잡은 항목 중 **작업자 행동이 필요한 것만** 포함. RESOLVED 표/내부 카운트는 세부에 둠.
-- "핵심 결정"은 design 문서에서 확정된 주요 AC·설계 결정을 3~7개로 압축. 작업자가 의도와 1:1 비교 가능해야 함.
-- "세부 보기" 입력 시 검증자별 PASS/FAIL 원문, CONCERN 표, 숙의 결과 등 기존 상세 출력 제공.
-
-
-| 등급 | 기준 | 조치 |
-|------|------|------|
-| **통과**(PASS) | 전 항목 통과 | 다음 단계(plan)로 진행 |
-| **주의**(CONCERNS) | 경미한 이슈 (표현 개선 수준) | `AskUserQuestion`으로 판단 위임. 수용 시 진행 |
-| **재작업**(REWORK) | AC 불명확, 영향도 누락 등 | design 문서 해당 항목 수정 → 재검수 |
-| **실패**(FAIL) | 근본적 문제 (요구사항 자체 모호) | design 파일 유지한 채 clarify부터 재실행 |
-
-> **재작업 연속 3회 시 실패로 에스컬레이션**: 같은 항목이 반복 실패하면 요구사항 자체에 문제가 있을 가능성 높음.
-
-**주의 판정 시**: 먼저 위 "사용자 보고 출력 포맷 (표준)" 섹션의 **CONCERNS 골격으로 사용자에게 보고**한 뒤, 아래 `AskUserQuestion`으로 판단을 위임합니다.
-
-**AskUserQuestion 호출**:
-```
-question: "경미한 이슈가 발견되었습니다. 어떻게 진행할까요?"
-header: "주의"
-options:
-  - label: "수용 — 진행 (Recommended)"
-    description: "경미한 이슈를 인지하고 다음 단계로 진행합니다"
-  - label: "수정 후 재검수"
-    description: "이슈를 수정한 뒤 review-req를 다시 실행합니다"
-multiSelect: false
-```
-
-**재작업 처리 흐름**:
-1. 위 "사용자 보고 출력 포맷 (표준)" 섹션의 REWORK 골격으로 사용자에게 보고 (헤더에 `(n/3회)` 명시)
-2. 상태 파일의 `rework_counts.review-req`를 +1 (`rework_counts.review-req` ≥ 3이면 실패로 에스컬레이션 — 이 경우 REWORK 골격 대신 **FAIL 골격으로 재보고**한 뒤 phase를 `"clarifying"`으로 되돌리고 사용자에게 clarify 재실행 안내)
-3. phase를 `"clarifying"`으로 되돌림
-4. 사용자가 design 문서 수정
-5. 수정 완료 후 다시 `/forge-flow:review-req` 실행 (workflow-state 훅이 현재 phase를 안내)
-
-**FAIL 판정 시** (근본적 문제 또는 REWORK 3회 에스컬레이션):
-1. 위 "사용자 보고 출력 포맷 (표준)" 섹션의 **FAIL 골격으로 사용자에게 보고**
-2. design 파일은 유지한 채 phase를 `"clarifying"`으로 되돌리고 사용자에게 `/forge-flow:clarify` 재실행 안내
-
-### 4단계: 결과 기록
-
-design 문서의 `## 검수 결과` 섹션에 요약 기록, 상세 이력은 `.forge-flow/design/{task_id}.review.md`에 기록:
-
-**design 문서** (`## 검수 결과`):
-```markdown
-## 검수 결과
-- review-req: PASS (2026-03-13)
-```
-
-**{task_id}.review.md** (상세 이력 — 누적):
-```markdown
-### review-req
-- #1 CONCERNS: AC-3 "응답시간 500ms 이내" → 측정 기준 모호
-  → 수용: "p95 기준 500ms"로 구체화
-```
-
-## 상태 파일 갱신 (완료 시)
-
-PASS 시:
-```json
-{ "phase": "req-reviewed", "stop_count": 0, "rework_counts": { "review-req": 0 } }
-```
-
-REWORK 시:
-```json
-{ "phase": "clarifying", "rework_counts": { "review-req": +1 } }
-```
-> `rework_counts.review-req`는 REWORK 판정마다 +1. 3 이상이면 FAIL로 에스컬레이션.
-> `stop_count`는 REWORK/FAIL 후퇴 시 리셋하지 않습니다.
-
-## 완료 후 다음 단계
-
-review-req PASS 후, **위 "사용자 보고 출력 포맷 (표준)" 섹션의 PASS 골격을 사용하여 보고하고 `AskUserQuestion`으로 확인**합니다:
-
-```
-[review-req] PASS → 다음: plan (sonnet)
-
-확인 필요 (N)
-  □ ... — 너 결정
-  (또는 "없음")
-
-핵심 결정 (이번 단계 확정사항)
-  · {design 문서의 주요 AC/결정 3~7개 요약}
-
-세부 보기: "세부" 입력
-```
-
-**AskUserQuestion 호출**:
-```
-question: "요구사항 검수를 통과했습니다. 어떻게 진행할까요?"
-header: "통과 — 검수 승인"
-options:
-  - label: "승인 — plan 진행 (Recommended)"
-    description: "구현 계획 수립으로 진행합니다"
-  - label: "수정 필요"
-    description: "요구사항을 일부 수정한 뒤 재검수합니다"
-  - label: "재검토 — clarify부터"
-    description: "요구사항을 처음부터 다시 정리합니다"
-multiSelect: false
-```
-
-- "승인" → **즉시 `/forge-flow:plan`을 호출**하여 구현 계획을 설계합니다.
-- "수정 필요" / Other → design 문서 수정 후 재검수.
-- "재검토" → phase를 `"clarifying"`으로 되돌리고 clarify 재실행.
+| 항목 | 기존 | v5 |
+|------|------|-----|
+| 검증자 spawn | TeamCreate+Agent 산문 ~434줄 | `workflows/review-req.js` Workflow |
+| 중복 처리 | 메인이 수동 숙의 | 스크립트 dedup 배리어(텍스트 병합) |
+| 적대적 확정 | 없음 | finding당 N명 refute, **엄격 과반 반박만 폐기 + 불확실=결함유지** — 신규 |
+| verdict 어휘 | PASS/CONCERNS/REWORK/FAIL | **PASS/CONCERNS/REWORK** (FAIL=하네스 §7) |
+| 에스컬레이션 | `rework_counts.review-req>=3→FAIL` | `rework_lifetime` 통일(전역6 우선·per-gate3) |
+| throw 처리 | 해당 없음 | **wiring 버그 ≠ content REWORK** (§5) — 신규 |
+| 상태/CONCERNS | 메인 | **메인 유지** (seam 불변) |
