@@ -105,7 +105,7 @@ function reconPrompt(branches, baseRef, waveLabel) {
 4. **전체 스위트 함께 실행** (병합된 통합 상태에서 — disjoint write도 의미적 비양립 가능, 이게 진짜 게이트):
    ${A.projectContext ? '빌드/테스트: ' + A.projectContext : '저장소 빌드/테스트 명령'}
    PASS/FAIL/SKIP을 suiteStatus로.
-5. 병합된 unit worktree 정리: 각 git worktree remove --force <path>.
+5. 병합된 unit 정리: 각 worktree git worktree remove --force <path> + **병합된 브랜치 삭제** git branch -d <branch>(-d는 미병합 시 거부=안전). 충돌로 미병합된 브랜치는 보존(REWORK 재사용).
 6. 반환: integrationRef(병합 후 ${integration} 짧은 해시), mergeStatus, suiteStatus, conflicts, note.
 
 병합 결과를 부풀리지 마라. 충돌·스위트 실패는 정직히 보고.`
