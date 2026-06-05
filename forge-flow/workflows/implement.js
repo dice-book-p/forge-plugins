@@ -75,9 +75,14 @@ function implPrompt(unit, baseRef) {
 3. **담당 파일만 변경**한다 (아래 writes 목록 외 파일 수정 금지):
    - writes: ${JSON.stringify(unit.writes)}
    - reads (참고만, 변경 금지): ${JSON.stringify(unit.reads || [])}
-4. 검증방식 실행: ${unit.verifyMethod || '스킵'} / 기준: ${unit.verifyCriteria || '—'}
+${/TDD/.test(unit.verifyMethod || '') ? `4. **TDD 순서 강제** (검증방식=${unit.verifyMethod}) — RED→GREEN→REFACTOR를 순서대로:
+   - RED: 실패하는 테스트 먼저 작성 → 실행하여 **FAIL 확인**(통과하면 테스트가 무의미 → 다시). FAIL 로그를 note에 기록.
+   - GREEN: 테스트를 통과시킬 **최소 구현** → 실행하여 PASS 확인.
+   - REFACTOR: 코드 정리(테스트 PASS 유지). 기준: ${unit.verifyCriteria || '—'}
+   - 모든 단계 통과 시 verifyResult=PASS. RED에서 FAIL 미관측 또는 GREEN 미달성 → status=BLOCKED, verifyResult=FAIL.`
+: `4. 검증방식 실행: ${unit.verifyMethod || '스킵'} / 기준: ${unit.verifyCriteria || '—'}
    - PASS면 verifyResult=PASS, FAIL이면 수정 시도 후 재실행. 못 고치면 status=BLOCKED, verifyResult=FAIL.
-   - 검증방식이 '스킵*'이면 verifyResult=SKIP.
+   - 검증방식이 '스킵*'이면 verifyResult=SKIP.`}
 5. worktree 안에서 커밋: git add -A && git commit -m "${unit.id}: ${unit.title}"
 6. 반환: unitId, branch(=impl/${A.taskId}/${unit.id}), status, verifyResult, note(구현 요약).
 
@@ -93,22 +98,24 @@ ${A.reworkLogExcerpt ? '과거 실수(회피): ' + A.reworkLogExcerpt : ''}
 }
 
 // ── reconciliation 프롬프트 (wave 브랜치 통합 병합 + 전체 스위트) ──
-function reconPrompt(branches, baseRef, waveLabel) {
+function reconPrompt(unitsInfo, baseRef, waveLabel) {
   return `당신은 ${A.taskId || '작업'}의 통합 담당자입니다. ${waveLabel}의 구현 브랜치들을 통합 브랜치에 병합합니다.
 
-## 절차
+## 4단계 reconciliation (superpowers — 순서대로)
 1. cd ${repoRoot}
-2. 통합 브랜치 체크아웃: git checkout ${integration} (현재 ${baseRef})
-3. 아래 브랜치를 **순서대로** 병합 (P0 writes 비충돌 보장 → clean 기대):
-   ${JSON.stringify(branches)}
-   각: git merge --no-edit <branch>. 충돌 시 충돌 파일 기록(conflicts), 해당 병합 abort(git merge --abort), mergeStatus=CONFLICT/PARTIAL.
-4. **전체 스위트 함께 실행** (병합된 통합 상태에서 — disjoint write도 의미적 비양립 가능, 이게 진짜 게이트):
+2. **① 각 unit 요약 검토** (병합 전 무엇이 바뀌었나 파악):
+   ${JSON.stringify(unitsInfo)}
+3. 통합 브랜치 체크아웃: git checkout ${integration} (현재 ${baseRef})
+4. **② 편집 충돌 검사 = 순차 병합** (P0 writes 비충돌 보장 → clean 기대):
+   위 unit들의 branch를 순서대로 git merge --no-edit <branch>. 충돌 시 충돌 파일 기록(conflicts), 해당 병합 abort(git merge --abort), mergeStatus=CONFLICT/PARTIAL.
+5. **③ 전체 스위트 함께 실행** (병합된 통합 상태 — 이게 진짜 게이트):
    ${A.projectContext ? '빌드/테스트: ' + A.projectContext : '저장소 빌드/테스트 명령'}
    PASS/FAIL/SKIP을 suiteStatus로.
-5. 병합된 unit 정리: 각 worktree git worktree remove --force <path> + **병합된 브랜치 삭제** git branch -d <branch>(-d는 미병합 시 거부=안전). 충돌로 미병합된 브랜치는 보존(REWORK 재사용).
-6. 반환: integrationRef(병합 후 ${integration} 짧은 해시), mergeStatus, suiteStatus, conflicts, note.
+6. **④ 체계적 오류 spot-check** (disjoint write라도 의미적 비양립 가능): 병합된 통합 diff에서 unit 간 — 패턴 불일치(같은 일 다른 방식), 헬퍼/타입 중복 정의, 인터페이스 시그니처 어긋남, 명명 규칙 분산 — 을 점검한다. 발견 시 note에 구체 기록(차단 판정은 suite/REWORK가 담당, 본 단계는 관측·보고).
+7. 정리: 병합된 각 worktree git worktree remove --force <path> + 병합된 브랜치 git branch -d <branch>(-d는 미병합 거부=안전). 충돌 미병합 브랜치는 보존(REWORK 재사용).
+8. 반환: integrationRef(병합 후 ${integration} 짧은 해시), mergeStatus, suiteStatus, conflicts, note(④ spot-check 결과 포함).
 
-병합 결과를 부풀리지 마라. 충돌·스위트 실패는 정직히 보고.`
+병합·검증 결과를 부풀리지 마라. 충돌·스위트 실패·체계적 오류는 정직히 보고.`
 }
 
 // ── 실행: wave 순차, wave 내 구현자 병렬, wave 끝 reconciliation ──
@@ -154,7 +161,7 @@ for (const w of waves) {
   // wave 끝 reconciliation (단일 통합 담당자 — 순차 병합 + 전체 스위트)
   log(`[${w}] reconciliation — ${mergeable.length}개 브랜치 병합`)
   const recon = await agent(
-    reconPrompt(mergeable.map(r => r.branch), baseRef, w),
+    reconPrompt(mergeable.map(r => ({ branch: r.branch, unitId: r.unitId, note: r.note })), baseRef, w),
     { label: `reconcile:${w}`, phase: 'Reconcile', schema: RECON_SCHEMA }
   )
   if (recon) {
