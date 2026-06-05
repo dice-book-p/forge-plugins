@@ -602,89 +602,30 @@ options:
 multiSelect: false
 ```
 
-#### 에이전트팀 spawn 절차
+#### 구현 실행 — implement Workflow (wave 병렬 + reconciliation)
 
-사용자 승인 후:
+사용자 승인 후, 메인은 **`implement` 워크플로**를 호출하여 wave별 병렬 구현을 위임한다(기존 TeamCreate+Agent 수작업 대체). wave별 구현자가 **격리 worktree**에서 동시 구현하고, wave 끝마다 reconciliation 담당자가 통합 브랜치에 병합한다.
 
-1. **`TeamCreate` 호출**: `{ "team_name": "impl-{task_id}", "description": "구현 팀" }`
-2. **공유 인터페이스 사전 커밋**: 구현자 간 경계가 되는 타입/인터페이스가 있으면 리더가 먼저 작성 + 커밋
-3. **`TaskCreate`로 작업 생성**: 각 구현자 + 리뷰어의 작업 생성
-4. **`Agent` 도구 + `team_name` + `name` + `model: "sonnet"` 파라미터로 팀원 spawn**: 각 역할별로 팀원을 spawn하되, 아래 프롬프트 템플릿에 따라 컨텍스트 전달
-5. **팀원 메시지 자동 수신**: 완료 보고, 이슈 발생 시 자동 전달
-6. **통합 완료 후**: `SendMessage`로 각 팀원에게 shutdown_request → `TeamDelete`
+> **격리 worktree 근거(정밀)**: source writes는 wave 분해(3-B)로 비충돌 보장이나 — 같은 wave unit들이 `검증방식`(빌드/테스트)을 **동시 실행 시 공유 빌드 상태**(`target/`·`node_modules/`·`.pyc`)를 경쟁한다. worktree 격리는 *파일 편집*이 아니라 **동시 빌드 격리**를 위한 것. (git 레벨 병합 메커니즘은 검증 완료 — disjoint writes → 순차 병합 clean.)
 
-**구현자 프롬프트 템플릿** (`model: "sonnet"`):
-```
-당신은 {프로젝트명}의 {담당 범위} 구현자입니다.
+**호출 절차**:
+1. `Workflow` 도구를 `scriptPath`로 호출 — robust glob 1순위:
+   `marketplaces/*/forge-flow/workflows/implement.js` (count=1; 다중 매치 시 `$CLAUDE_PLUGIN_ROOT/workflows/implement.js` 폴백).
+2. `args` 주입 (객체; 워크플로가 JSON 문자열로 받아 방어 파싱):
+   - `taskId`, `scale`
+   - `repoRoot`: **대상 저장소 절대 경로** (`.forge-flow/config.json` 또는 현재 repo 루트 — 누락 시 워크플로 fail-fast)
+   - `integrationBranch`: plan 6단계서 분기한 기능 브랜치명
+   - `workUnits`: design `### work units` 표를 파싱한 배열 — 각 `{ id, title, ac, writes:[파일], reads:[파일], verifyMethod(=검증방식), verifyCriteria(=검증 기준), dependsOn:[id](=의존), wave }`
+   - `designExcerpt`: `## 구현 계획`/AC 발췌, `patternsExcerpt`: 따를 기존 패턴, `projectContext`: 스택+빌드 명령 ≤3줄, `reworkLogExcerpt`: rework-log `[코드]` ×2+
+3. **반환 처리**: `{ verdict, integrationBranch, integrationRef, done:[id], blocked:[id], units, reconciliation }`
+   - `verdict==='COMPLETE'` (blocked 0) → phase `implementing` 유지하고 **즉시 `/forge-flow:verify` 호출**(integrationRef를 verify gitDiff 근거로).
+   - `verdict==='PARTIAL'|'FAILED'` → `blocked` unit이 REWORK 대상. §7 에스컬레이션 규칙으로 라우팅(rework_lifetime 갱신은 메인). 통합 브랜치엔 성공 wave까지만 병합돼 있음.
+4. **throw 처리**: status=failed 또는 반환에 `verdict` 부재 → 배선 오류(repoRoot/workUnits/integrationBranch 주입 점검·재호출). 2연속 throw = 보고·중단.
 
-## 작업 개요
-{design 문서의 요구사항 요약}
-
-## 담당 범위
-{담당 파일 목록}
-
-## 충족할 AC
-{이 구현자가 담당하는 AC 항목}
-
-## 따를 기존 패턴
-{design 문서의 '따를 기존 패턴' 테이블 전문}
-
-> 위 패턴을 반드시 따라 구현하세요. 기존 패턴과 다른 방식으로 작성하면 verify에서 REWORK 판정됩니다.
-
-## 인터페이스 약속
-{다른 구현자와의 경계 — API 시그니처, 공유 타입, DB 스키마 등}
-
-## 컨텍스트 관리
-- 긴 빌드/테스트 로그는 파일로 저장 후 핵심만 보고
-- 에러 발생 시 [ERROR] 태그로 표시하여 빠른 식별
-- 불필요한 도구 출력을 컨텍스트에 누적하지 않기
-
-## 단위검증 절차 (M/L 규모, design `### work units` 섹션이 있을 때만 적용)
-- 담당 범위가 work unit 여러 개에 걸쳐 있으면, **다음 unit 착수 직전에 직전 unit의 `검증방식`을 실행**한다(마지막 unit은 unit 완료 직후 실행).
-- 검증방식별 실행:
-  - `단위테스트`: 해당 단위테스트 명령을 실행하여 PASS 확인
-  - `수동`: design AC 기준 self-review 또는 사용자 확인 후 PASS 기록
-  - `스킵(사유)`: 즉시 PASS로 간주하고 사유를 보고에 포함
-- **PASS면** 다음 unit 착수.
-- **FAIL이면** 즉시 수정 후 재검증, PASS할 때까지 다음 unit 착수 금지. 단, 의존 관계가 없는 **독립 unit은 다른 구현자가 계속 진행**한다(에이전트팀 병렬 구성).
-- **상태 추적**: 각 unit의 PASS/FAIL은 본인 컨텍스트(in-memory)에서 추적하며 별도 파일 저장 없음. 리더에게 unit 완료 보고 시 검증방식·결과를 함께 보고한다.
-
-## 완료 조건
-1. 담당 범위의 코드 구현 완료
-2. 빌드 성공 확인
-3. (해당 시) 모든 담당 work unit의 단위검증 PASS
-4. 태스크를 completed로 업데이트
-5. 담당 범위 외 파일 수정 금지
-```
-
-**리뷰어 프롬프트 템플릿** (`model: "sonnet"`):
-```
-당신은 {프로젝트명}의 코드 리뷰어입니다.
-
-## design 문서
-{design 문서 전문}
-
-## 구현자 구성
-{각 구현자의 담당 범위 + AC}
-
-## 리뷰 관점
-1. 각 구현자의 코드가 해당 AC를 충족하는지
-2. 구현자 간 인터페이스가 약속대로 일치하는지
-3. 기존 프로젝트 패턴과의 일관성
-4. 사이드이펙트 여부
-
-## 컨텍스트 관리
-- 긴 diff는 파일 단위로 순차 리뷰 (전체를 한번에 로드하지 않기)
-- 이슈 발견 시 [ISSUE] 태그로 표시하여 구현자가 빠르게 식별
-
-## 리뷰 방식
-- 구현자의 태스크가 completed되면 코드를 리뷰
-- 이슈 발견 시 메시지로 해당 구현자에게 전달
-- 리뷰 완료 후 태스크를 completed로 업데이트
-```
-
-4. **리더 대기**: 팀원들이 작업하는 동안 리더는 진행 상황을 모니터링하고 이슈 발생 시 조율
-5. **통합**: 모든 구현자 완료 → 리뷰어 완료 → 리더가 변경 통합
+> **단위검증·의존 게이트 = 구조적**(P0). reader의 in-memory PASS/FAIL 추적 불요 — wave 분해가 독립성을, `dependsOn` 차단 전파가 의존 실패를, 각 구현자의 `검증방식` 실행이 단위검증을 담당. wave 간 reconciliation의 "전체 스위트 함께 실행"이 의미적 비양립(disjoint write라도)을 잡는 최종 게이트.
+> **seam 계약**: 워크플로는 구현 결과 요약만 반환. 통합 브랜치 상태·verify 전이·rework 카운터는 메인.
+> **task별 Spec compliance 리뷰**(위 `중간 검수 A`)는 L규모서 reconciliation 이후 메인이 별도 수행 가능(에이전트간 검수, 대화형 아님).
+> **저하 모드**: `implement` 워크플로 미가용(2연속 throw) 시 메인이 단일 세션으로 wave 순서대로 직접 구현(단위검증 절차 본인 수행).
 
 #### 상태 파일 확장 (에이전트팀 사용 시)
 
@@ -730,6 +671,6 @@ multiSelect: false
 
 - **S, M(조건 미해당)** → 사용자의 추가 입력 없이 설계대로 **즉시 구현을 시작**합니다.
 - **M(조건 해당), L** → 사용자의 추가 입력 없이 **즉시 `/forge-flow:review-plan`을 호출**합니다.
-- **에이전트팀 구성 시** → 사용자 승인 후 팀원 spawn, 팀원들이 병렬 구현 시작. 리더는 모니터링 + 조율.
+- **에이전트팀 구성 시** (wave 최대 너비 2+) → 사용자 승인 후 메인이 **`implement` 워크플로 호출**(wave 병렬 구현자 + reconciliation). 완료 verdict로 verify 진행 또는 blocked REWORK 라우팅. (위 "구현 실행 — implement Workflow" 참조)
 
-> **단일 세션 구현 시 단위검증 절차** (M/L 규모, design `### work units` 섹션이 있을 때): 메인 세션이 직접 구현할 때도 위 "구현자 프롬프트 템플릿"의 `## 단위검증 절차` 규칙을 그대로 따릅니다. 다음 unit 착수 직전 직전 unit의 검증방식을 실행하고, FAIL이면 의존 후속 unit 진행을 차단합니다(독립 unit은 계속). 상태는 본인 컨텍스트(in-memory)에서 추적합니다.
+> **단일 세션 구현 시 단위검증 절차** (M/L 규모, design `### work units` 섹션이 있을 때 — wave 최대 너비 1 또는 implement 워크플로 저하 모드): 메인 세션이 직접 wave 순서대로 구현할 때, 다음 unit 착수 직전 직전 unit의 `검증방식`을 실행하고, FAIL이면 의존 후속 unit 진행을 차단합니다(독립 unit은 계속). 검증방식별: `단위테스트`→명령 실행 PASS 확인, `수동`→AC 기준 self-review, `스킵(사유)`→즉시 PASS. 상태는 본인 컨텍스트(in-memory)에서 추적합니다. (병렬 구현 시 이 절차는 implement 워크플로의 각 구현자가 수행하므로 메인 추적 불요.)
