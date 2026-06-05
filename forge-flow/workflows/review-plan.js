@@ -32,6 +32,9 @@ if (!A.designDoc || !String(A.designDoc).trim()) {
 const scale = A.scale || 'M'
 const SCALE_DEFAULT_STRENGTH = { S: 1, M: 2, L: 3 }
 let strength = A.strength || SCALE_DEFAULT_STRENGTH[scale] || 2
+// 비용 floor: 저위험 trivial 계획(순수로직·외부의존/API/DB/UI/보안 없음)이면 관점 1 + critic 스킵 + refuter 1.
+const lightweight = A.lightweight === true
+if (lightweight) strength = 1
 
 // ── 검증 관점 (plan judge panel) ──────────────────────────────────
 // 강도 = 동시 평가자 수. 관점풀에서 strength개 선택, 부족하면 순환.
@@ -172,7 +175,7 @@ design 계획과 저장소를 직접 확인하여 판단하라:
 }
 
 // ── 단일패스: 관점 fan-out + critic → dedup → refute 확정 → verdict ─
-log(`review-plan 시작 — 규모 ${scale}, 관점 ${strength}개 + completeness critic 1`)
+log(`review-plan 시작 — 규모 ${scale}, 관점 ${strength}개${lightweight ? ' (lightweight: critic 생략)' : ' + completeness critic 1'}`)
 
 const perspectives = perspectivesFor(strength)
 const raw = await parallel([
@@ -183,7 +186,8 @@ const raw = await parallel([
       schema: VERIFIER_SCHEMA,
     })
   ),
-  () => agent(criticPrompt(), { label: 'plan:critic', phase: 'Critic', schema: VERIFIER_SCHEMA }),
+  // lightweight면 completeness critic 생략.
+  ...(lightweight ? [] : [() => agent(criticPrompt(), { label: 'plan:critic', phase: 'Critic', schema: VERIFIER_SCHEMA })]),
 ])
 const findings = raw.filter(Boolean).flatMap(r => r.findings || [])
 
@@ -207,7 +211,7 @@ if (findings.length > 1) {
 }
 
 // 적대적 확정: finding당 회의론자 다수 refute, 엄격 과반 반박이면 false positive로 폐기
-const REFUTERS = scale === 'L' ? 3 : 2
+const REFUTERS = lightweight ? 1 : (scale === 'L' ? 3 : 2)
 const confirmed = (await parallel(
   canonical.map(f => () =>
     parallel(

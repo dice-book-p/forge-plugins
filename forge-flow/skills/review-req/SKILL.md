@@ -57,12 +57,15 @@ Workflow({
   args: {
     taskId, scale,                       // 상태파일
     strength,                            // §3 검증설정 (미설정 시 워크플로 규모기본)
+    lightweight,                         // 비용 floor (아래) — 저위험 trivial이면 true
     projectContext: "<CLAUDE.md 스택/구조 요약 ≤3줄 + '대상 저장소 루트=<절대경로>'>",
     designDoc: "<design 문서 전문 — 검증 대상 정적 산출물>",
     reworkLogExcerpt: "<rework-log 과거 요구 결함 패턴 발췌, 없으면 ''>"
   }
 })
 ```
+
+> **비용 floor (`lightweight`)**: review-req는 plan 전 실행이라 plan의 경량 판정을 못 받는다 → **design 기반으로 여기서 직접 판정**한다(plan SKILL 4-A0와 동일 기준). **모두** 충족 시 `lightweight=true`: 순수 로직/표시 변경 · 외부의존 추가 없음 · API계약/DB 변경 없음 · UI/통합 표면 없음 · 보안 민감경로 아님 · 자동 테스트 검증가능 · 표면 작음(AC 소수·단일 모듈). 하나라도 불충족 또는 **확신 없으면 false**(보수적, 누락 위험 회피). true면 워크플로가 관점 1 + critic 생략 + refuter 1로 비용 절감(게이트 편향=결함유지 유지).
 
 > **이 스킬은 위 Workflow를 반드시 호출한다** (opt-in 충족: 스킬 지시문 경로).
 > Workflow는 판정만 반환 — 관점별 독립 검증자 + completeness critic 병렬 → dedup 배리어(동일 근본이슈 텍스트병합) → finding당 적대적 확정(엄격 과반 반박만 폐기, 불확실=결함유지) → verdict.

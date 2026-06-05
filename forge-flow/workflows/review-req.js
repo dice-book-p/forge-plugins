@@ -31,6 +31,11 @@ if (!A.designDoc || !String(A.designDoc).trim()) {
 const scale = A.scale || 'M'
 const SCALE_DEFAULT_STRENGTH = { S: 1, M: 3, L: 4 }
 let strength = A.strength || SCALE_DEFAULT_STRENGTH[scale] || 3
+// 비용 floor: plan이 저위험 trivial 과제(순수로직·외부의존/API/DB/UI/보안 없음·테스트로 검증가능)로 판정 시 lightweight.
+// 규모(크기)와 직교한 복잡도 게이트 — 관점 1개 + critic 스킵 + refuter 1로 fan-out 비용 대폭 절감.
+// 기본 false(보수적). 게이트 편향(결함유지)은 유지: refuter 1이라도 불확실=결함유지.
+const lightweight = A.lightweight === true
+if (lightweight) strength = 1
 
 // ── 검증 관점 (req 심문) ──────────────────────────────────────────
 // 강도 = 동시 검증자 수. 관점풀에서 strength개 선택, 부족하면 순환.
@@ -172,7 +177,7 @@ design 문서를 직접 확인하여 판단하라:
 }
 
 // ── 단일패스: 관점 fan-out + critic → refute 확정 → verdict ────────
-log(`review-req 시작 — 규모 ${scale}, 관점 ${strength}개 + completeness critic 1`)
+log(`review-req 시작 — 규모 ${scale}, 관점 ${strength}개${lightweight ? ' (lightweight: critic 생략)' : ' + completeness critic 1'}`)
 
 const perspectives = perspectivesFor(strength)
 const raw = await parallel([
@@ -183,7 +188,8 @@ const raw = await parallel([
       schema: VERIFIER_SCHEMA,
     })
   ),
-  () => agent(criticPrompt(), { label: 'req:critic', phase: 'Critic', schema: VERIFIER_SCHEMA }),
+  // lightweight면 completeness critic 생략 (저위험 trivial — 관점 1개로 충분).
+  ...(lightweight ? [] : [() => agent(criticPrompt(), { label: 'req:critic', phase: 'Critic', schema: VERIFIER_SCHEMA })]),
 ])
 const findings = raw.filter(Boolean).flatMap(r => r.findings || [])
 
@@ -207,7 +213,7 @@ if (findings.length > 1) {
 }
 
 // 적대적 확정: finding당 회의론자 다수 refute, 엄격 과반 반박이면 false positive로 폐기
-const REFUTERS = scale === 'L' ? 3 : 2
+const REFUTERS = lightweight ? 1 : (scale === 'L' ? 3 : 2)
 const confirmed = (await parallel(
   canonical.map(f => () =>
     parallel(

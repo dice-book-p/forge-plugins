@@ -33,6 +33,9 @@ const SCALE_DEFAULT_STRENGTH = { S: 1, M: 1, L: 2 }
 let strength = A.strength || SCALE_DEFAULT_STRENGTH[scale] || 1
 const convergenceMax = A.convergenceMax || SCALE_DEFAULT_STRENGTH[scale] || 1
 let round = A.startRound || 0
+// 비용 floor: 저위험 trivial 변경이면 검증자 1 + refuter 1 (게이트 편향=결함유지 유지).
+const lightweight = A.lightweight === true
+if (lightweight) strength = 1
 
 // ── 검증 렌즈 (관점 분리) ─────────────────────────────────────────
 // 강도 = 동시 검증자 수. 렌즈 풀에서 strength개 선택, 부족하면 순환.
@@ -160,7 +163,7 @@ while (round < convergenceMax) {
   }
 
   // 적대적 확정: finding당 회의론자 다수 refute, 과반 반박이면 false positive로 폐기
-  const REFUTERS = scale === 'L' ? 3 : 2
+  const REFUTERS = lightweight ? 1 : (scale === 'L' ? 3 : 2)
   const confirmed = (await parallel(
     findings.map(f => () =>
       parallel(

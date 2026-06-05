@@ -349,6 +349,27 @@ implement 권고: wave 2계층, 최대 너비 2 → 구현자 2명, W0 동시 2 
 
 확정 규모를 기반으로 검증 강도, 수렴 라운드, 테스트 방식을 설정합니다.
 
+#### 4-A0: 경량(lightweight) 판정 — 비용 floor (규모와 직교)
+
+규모(크기)와 별개로 **복잡도/위험**을 판정한다. 저위험 trivial 과제에 풀 fan-out 검증(관점 복수 + completeness critic + 다수 refuter)은 **과잉 프로비저닝**(실측: 4파일 유틸이 review-req 17에이전트/394k 소비, 동일 결함을 단일 패스로 ~10k에 포착). 이를 막는 게이트.
+
+**`lightweight=true` 조건** (아래 **모두** 충족 시):
+- 순수 로직/표시 변경 (외부 의존성 추가 없음)
+- API 계약·DB 스키마 변경 없음
+- UI/통합 표면 없음 (브라우저 동작 불필요)
+- 보안 민감 경로 아님 (인증/권한/입력신뢰경계 무관)
+- 자동 테스트로 검증 가능 (수동 검증 불필요)
+- 변경 표면 작음 (대략 work unit ≤ 3, 단일 모듈)
+
+하나라도 불충족 → `lightweight=false`(기본, 보수적). **확신 없으면 false**(게이트 = 누락 위험 회피).
+
+**효과** (review-req/review-plan/verify args에 `lightweight: true` 주입 시):
+- 관점 1개로 축소 + completeness critic 생략 + refuter 1명 → fan-out 비용 대폭 절감(17→~3 에이전트).
+- 게이트 편향(결함유지)은 유지: refuter 1명이라도 불확실 시 결함 보존.
+- S규모는 사실상 항상 lightweight 후보. M규모 중 위 조건 충족분도 포함(예: 순수 util 추가).
+
+> 판정 결과를 **review-req/review-plan/verify 호출 args에 `lightweight` 필드로 주입**한다(scale·strength와 함께). 미주입 시 false(풀 검증).
+
 #### 4-A: 검증 강도
 
 검증 강도는 verify와 test 단계의 **에이전트팀 검수 수준**을 결정합니다:

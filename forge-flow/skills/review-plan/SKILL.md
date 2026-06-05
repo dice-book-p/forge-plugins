@@ -60,6 +60,7 @@ Workflow({
   args: {
     taskId, scale,                       // 상태파일 (M|L만 — S는 §1 스킵)
     strength,                            // §3 검증설정 (미설정 시 워크플로 규모기본)
+    lightweight,                         // plan 4-A0 경량 판정 (저위험 trivial이면 true → 관점1+critic생략+refuter1)
     projectContext: "<CLAUDE.md 스택/구조 요약 ≤3줄 + '대상 저장소 루트=<절대경로>'>",
     designDoc: "<design 문서 전문 — 반드시 ## 구현 계획 섹션 포함>",
     reworkLogExcerpt: "<rework-log 과거 계획 결함 패턴 발췌, 없으면 ''>"

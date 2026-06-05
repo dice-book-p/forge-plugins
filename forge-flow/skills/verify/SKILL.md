@@ -72,6 +72,7 @@ Workflow({
   args: {
     taskId, scale,                       // 상태파일
     strength, convergenceMax,            // §3 검증설정
+    lightweight,                         // plan 4-A0 경량 판정 (저위험 trivial이면 true → 검증자1+refuter1)
     startRound: <convergence_round>,     // 상태파일 유지값
     projectContext: "<CLAUDE.md 스택/구조 + build_commands 요약, ≤3줄>",
     designExcerpt: "<design ## 요구사항/AC/따를 기존 패턴/검증 방법 발췌>",
