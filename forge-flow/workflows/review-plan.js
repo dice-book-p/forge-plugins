@@ -196,8 +196,13 @@ if (findings.length === 0) {
 log(`제기 ${findings.length}건 — 중복 병합`)
 let canonical = findings
 if (findings.length > 1) {
+  const reworkBefore = findings.filter(f => f.severity === 'REWORK').length
   const d = await agent(dedupPrompt(findings), { label: 'plan:dedup', phase: 'Dedup', schema: DEDUP_SCHEMA })
   if (d && Array.isArray(d.merged) && d.merged.length > 0) canonical = d.merged
+  // 안전망: dedup은 refute 상류 단일 에이전트(다수결 없음). REWORK 감소는 정상(중복 병합)일 수도,
+  // 위험(서로 다른 REWORK 누락)일 수도 — 게이트 편향(결함 누락 위험)상 감소를 관측 가능하게 로깅.
+  const reworkAfter = canonical.filter(f => f.severity === 'REWORK').length
+  if (reworkAfter < reworkBefore) log(`⚠ dedup REWORK ${reworkBefore}→${reworkAfter} 감소 — 누락 아닌 중복병합인지 확인`)
   log(`병합 후 ${canonical.length}건 → refute`)
 }
 
