@@ -19,7 +19,15 @@ export const meta = {
 //   reworkLogExcerpt: string,// rework-log 이번 영향범위 [코드]/[평가] ×2+ 발췌
 //   lenses: string[]?        // 검증 렌즈 오버라이드
 // }
-const A = args || {}
+// args는 문자열(JSON)로 도달할 수 있음 → 방어적 파싱 필수 (미파싱 시 전 필드 undefined → 폴백 FS 크롤 폭주).
+let A = args || {}
+if (typeof A === 'string') {
+  try { A = JSON.parse(A) } catch (e) { throw new Error('verify: args 파싱 실패 — ' + e.message) }
+}
+// fail-fast: 검증 대상(diff) 미주입 시 즉시 중단 (에이전트 FS 크롤 → 타프로젝트 환각 방지).
+if (!A.gitDiff || !String(A.gitDiff).trim()) {
+  throw new Error('verify: gitDiff 미주입 — 메인이 변경 diff를 args.gitDiff로 주입해야 함.')
+}
 const scale = A.scale || 'M'
 const SCALE_DEFAULT_STRENGTH = { S: 1, M: 1, L: 2 }
 let strength = A.strength || SCALE_DEFAULT_STRENGTH[scale] || 1
@@ -98,7 +106,7 @@ ${A.projectContext || '(없음)'}
 ${A.designExcerpt || '(없음)'}
 
 ## 변경 내용 (git diff)
-${A.gitDiff || '(diff 미주입 — 저장소를 직접 Read/Grep으로 확인)'}
+${A.gitDiff}
 
 ## 반복 실수 패턴 (해당 시 특히 주의)
 ${A.reworkLogExcerpt || '(없음)'}
