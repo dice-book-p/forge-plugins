@@ -1,5 +1,17 @@
 # forge-flow Changelog
 
+## v5.1.0 — 분석·구현 오케스트레이션 재설계 + 비용 floor
+
+분석(plan)·구현(implement)을 Agent팀에서 Workflow 도구로 마이그레이션하고, 병렬화 독립성을 결정론적으로 계산하는 wave 분해 게이트 도입.
+
+- **P0 파일셋 wave 분해 게이트**: work unit에 `writes`/`reads`/`wave` 컬럼. 병렬 안전 = `writes∩writes=∅ AND writes∩reads=∅(양방향) AND 무 depends_on`(read/write 위험까지 차단 — writes만 비충돌이면 stale read 무음 오류). wave = 위상정렬 + 파일충돌 분리. 독립성 판정 3곳 산재 → wave 단일진실 일원화.
+- **P1a plan 생성 judge panel**(`workflows/plan-judge.js`): 관점별 독립 초안(MVP/리스크/패턴충실) fan-out → 4차원 채점 → 최고안+이식 합성. S스킵/M선택/L필수.
+- **P1b implement Workflow**(`workflows/implement.js`): wave 순차 + wave내 구현자 병렬(격리 worktree) + wave간 reconciliation(순차병합 + 전체스위트 게이트 + 체계적오류 spot-check). dependsOn 실패 전파. 격리 근거 = 동시 빌드의 공유상태 경쟁.
+- **P2 decision-coverage 게이트**: plan 승인 전 모든 AC가 work unit에 귀속되는지 기계적 집합 대조(누락→차단). 자동검증 커버리지 플래그.
+- **비용 floor (`lightweight`)**: 저위험 trivial 과제는 review-req/review-plan/verify에서 관점1+critic생략+refuter1(과잉 fan-out 방지). plan 4-A0 판정, 기본 false=기존 동작 보존.
+- **잔여**: reconciliation 4단계(superpowers), TDD RED→GREEN→REFACTOR 순서 강제.
+- 라이브 e2e 입증: plan-judge·implement·review-req 실발동 + 전체 SKILL 관통(clarify→complete). git-레벨 병합 메커니즘 검증.
+
 ## v4.0.2
 
 - **fix (critical)**: CC 2.1+ 환경변수 드리프트 대응 — 세션 바인딩 복구
