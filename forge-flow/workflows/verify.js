@@ -89,7 +89,7 @@ const REFUTE_SCHEMA = {
   additionalProperties: false,
   required: ['refuted', 'reason'],
   properties: {
-    refuted: { type: 'boolean', description: '반박 성공(=실제 문제 아님)이면 true. 불확실하면 true(보수적).' },
+    refuted: { type: 'boolean', description: '반박 성공(=실제 문제 아님)이면 true. 불확실하면 false(보수적, 결함 유지).' },
     reason: { type: 'string' },
   },
 }

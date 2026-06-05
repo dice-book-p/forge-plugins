@@ -121,6 +121,31 @@ design `## 검수 결과`에 `- verify: PASS (날짜)`, 상세는 `{task_id}.rev
 
 → 사용자 입력 없이 **즉시 `/forge-flow:test` 호출** (test 스킵조건이면 자동 스킵 → complete).
 
+## Rework Log 관리
+
+> verify/test/complete가 공통 참조하는 규칙(test SKILL "rework-log 기록"·complete 회고가 본 절을 가리킴). REWORK 판정 시 `.forge-flow/rework-log.md`에 패턴 기록 → clarify/plan이 참조해 동일 실수 예방.
+
+**기록 절차**: ① 로그 읽기(없으면 생성) → ② 유사 패턴(같은 원인 유형) 검색 → ③ 있으면 카운트 +1·날짜 갱신 / 없으면 새 항목 추가 → ④ 관리 규칙 적용.
+
+**항목 형식**:
+```markdown
+## {원인 요약} (×{횟수}) [{차원}]
+- 최근: {날짜} | {verify/test/review-req/review-plan}
+- 파일: {관련 파일 또는 design 섹션}
+- 교훈: {재발 방지 핵심 한 줄}
+<!-- first: {최초 발생일} -->
+```
+
+**차원 태그** (제목 끝 1개 명시 — clarify는 `[코드]`·`[요구사항]`을 AC 재유입 스캔):
+- `[코드]`: 구현 코드 실수 — verify/test REWORK 기본값
+- `[평가]`: 검증자/테스터 오판 — 숙의/refute에서 기록
+- `[프로세스]`: 워크플로 비효율 — complete 회고
+- `[요구사항]`: 요구사항 해석·AC 결함 — **review-req REWORK** + complete 회고
+- `[계획]`: 구현계획 결함(전파누락·순서역전·범위침범) — **review-plan REWORK** (v5 신규 차원)
+- `[환경]`: 환경/도구 제약 — test 숙의
+
+**관리 규칙**: 최대 15건(초과 시 ×N 최저·동수면 오래된 날짜 순 삭제) / ×1 단발성은 60일 TTL / ×2+ 반복은 TTL 무관 유지.
+
 ---
 
 ## v5 변경 요약 (기존 대비)
