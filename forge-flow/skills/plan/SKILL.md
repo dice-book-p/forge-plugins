@@ -84,7 +84,34 @@ design 문서의 영향 범위를 기반으로 기존 코드를 상세 분석합
 
 ### 3단계: 구현 계획 작성
 
-design 문서의 `## 구현 계획` 섹션에 추가:
+#### 3-0단계: 계획안 생성 — judge panel (L 필수 · M 선택 · S 스킵)
+
+복잡한 작업은 메인이 단일 계획을 즉흥 작성하는 대신, **관점별 독립 계획안을 fan-out**하여 채점·합성한다(해법 공간이 넓을 때 단일 시도보다 우수). 비대화형이므로 Workflow로 위임한다(§대화형 경계 밖).
+
+**규모별 적용**:
+- **S 규모**: **스킵**. 메인이 단일 계획 직접 작성(해법 공간 좁음, fan-out 비용 낭비).
+- **M 규모**: **선택**. 설계 선택지가 실재할 때만(예: 패턴/구조 분기, 외부 의존 선택). 없으면 스킵.
+- **L 규모**: **필수**.
+
+**호출** (스킵 아닐 때):
+1. `Workflow` 도구를 `scriptPath`로 호출 — robust glob 1순위:
+   `marketplaces/*/forge-flow/workflows/plan-judge.js` (count=1 확인; 다중 매치 시 `$CLAUDE_PLUGIN_ROOT/workflows/plan-judge.js` 폴백).
+2. `args` 주입 (객체; 워크플로가 JSON 문자열로 받아 방어 파싱):
+   - `taskId`, `scale`
+   - `acList`: design `## 요구사항`/AC 발췌
+   - `patternsExcerpt`: 1단계 탐색 팀의 `[기존 패턴]` 요약
+   - `explorationSummary`: 1단계 탐색 팀 출력 전체(`[변경 대상 파일]`/`[영향 범위]`/`[기존 패턴]`/`[리스크]`) — **저장소 실재 근거**(추측 차단)
+   - `projectContext`: CLAUDE.md 스택/구조 ≤3줄
+   - `reworkLogExcerpt`: rework-log `[계획]`/`[코드]` ×2+ 발췌
+3. **반환**: `{ recommended, bestAngle, drafts:[{idx,angle,summary,changeFiles,sequence,risks,workUnits,scores,note}], synthesisGuidance }`.
+4. **메인이 합성**: `recommended` 초안을 기반으로 `synthesisGuidance`의 이식 아이디어를 검토·접목하여 아래 `## 구현 계획` 섹션을 작성한다. **work units는 초안의 것을 시드로 쓰되 writes/reads/의존을 확정하고, wave는 3-B 5단계에서 메인이 결정론 계산**(워크플로는 wave를 비워 반환).
+5. **throw 처리**: status=failed 또는 반환에 `drafts` 부재 → 배선 오류(args 누락 점검·재호출). 2연속 throw = 보고·중단. judge panel 없이도 메인이 단일 계획 작성으로 진행 가능(저하 모드).
+
+> **seam 계약**: 워크플로는 계획 *초안·순위·합성가이드*만 반환. 최종 design 작성·wave 분해·상태 전이는 메인. verify/review-* 워크플로와 동일 분리.
+
+#### 3-1단계: 최종 구현 계획 작성
+
+design 문서의 `## 구현 계획` 섹션에 추가(judge panel 적용 시 위 합성 결과 반영):
 
 ```markdown
 ## 구현 계획
