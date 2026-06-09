@@ -35,6 +35,11 @@ if (!integration) throw new Error('implement: integrationBranch 미주입.')
 const scale = A.scale || 'M'
 const repoRoot = A.repoRoot
 
+// ── 모델 티어 (v5.1.1) — fan-out 비용 절감 ────────────────────────
+// Workflow agent()는 model 미지정 시 세션모델 상속 → opus 세션이면 전 fan-out이 opus(5~10x 비용).
+// 구현·병합은 코드 생성/git 조작 난이도 → sonnet 고정(haiku는 부족). 설계·합성은 메인(opus) 몫.
+const MODEL = { standard: 'sonnet', mechanical: 'haiku' }
+
 // ── wave 그룹핑 (W0, W1, … 순서) ──────────────────────────────────
 const waveKey = u => u.wave || 'W0'
 const waveNum = w => parseInt(String(w).replace(/^W/, ''), 10) || 0
@@ -143,7 +148,7 @@ for (const w of waves) {
   // 구현자 병렬 fan-out (각 격리 worktree)
   const implRaw = await parallel(
     ready.map(u => () =>
-      agent(implPrompt(u, baseRef), { label: `impl:${u.id}`, phase: 'Implement', schema: IMPL_SCHEMA })
+      agent(implPrompt(u, baseRef), { label: `impl:${u.id}`, phase: 'Implement', schema: IMPL_SCHEMA, model: MODEL.standard })
     )
   )
   const impl = implRaw.filter(Boolean)
@@ -162,7 +167,7 @@ for (const w of waves) {
   log(`[${w}] reconciliation — ${mergeable.length}개 브랜치 병합`)
   const recon = await agent(
     reconPrompt(mergeable.map(r => ({ branch: r.branch, unitId: r.unitId, note: r.note })), baseRef, w),
-    { label: `reconcile:${w}`, phase: 'Reconcile', schema: RECON_SCHEMA }
+    { label: `reconcile:${w}`, phase: 'Reconcile', schema: RECON_SCHEMA, model: MODEL.standard }
   )
   if (recon) {
     reconResults.push({ wave: w, ...recon })

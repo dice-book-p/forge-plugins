@@ -1,5 +1,14 @@
 # forge-flow Changelog
 
+## v5.1.1 — Workflow fan-out 모델 티어링 (토큰 비용 핵심 누수 수정)
+
+- **fix (cost)**: 5개 워크플로 스크립트의 모든 `agent()` fan-out에 명시적 `model` 지정. Workflow `agent()`는 `model` 미지정 시 **세션 모델을 상속**하므로, opus 세션에서 forge-flow 실행 시 전 fan-out 검증자·구현자가 opus로 동작해 토큰 비용이 5~10배 폭증했다(v5.0/5.1 Agent팀→Workflow 마이그레이션이 기존 TeamCreate 경로의 `model:"sonnet"` 핀을 잃은 회귀).
+  - **티어**: 판단 작업(검증자·critic·refute·초안·채점·구현자·reconciliation) = `sonnet` / 순수 텍스트 병합(dedup) = `haiku`.
+  - **opus 경계**: 메인스레드(이미 opus)는 워크플로 verdict 수신·REWORK 라우팅·human gate(AskUserQuestion)·상태 기록을 담당. in-script fan-out(검증자·refute 투표·구현자 등 추론 작업)은 sonnet으로 충분 — 이는 v5.0 마이그레이션 전 TeamCreate 경로의 `model:"sonnet"` 고정과 **동일 복원**(품질 하향 아님). 스크립트 fan-out에는 opus를 두지 않는다(비용·테스트 규칙 양립).
+  - 각 스크립트 상단에 `const MODEL = { standard: 'sonnet', mechanical: 'haiku' }` + 사유 주석. 14개 `agent()` 호출에 적용(review-req 4·review-plan 4·verify 2·plan-judge 2·implement 2).
+  - **불변**: 오케스트레이션 구조·게이트·수렴·lightweight·seam 계약 일절 변경 없음. 모델 지정만 추가.
+  - **affected**: `workflows/review-req.js`, `workflows/review-plan.js`, `workflows/verify.js`, `workflows/plan-judge.js`, `workflows/implement.js`
+
 ## v5.1.0 — 분석·구현 오케스트레이션 재설계 + 비용 floor
 
 분석(plan)·구현(implement)을 Agent팀에서 Workflow 도구로 마이그레이션하고, 병렬화 독립성을 결정론적으로 계산하는 wave 분해 게이트 도입.

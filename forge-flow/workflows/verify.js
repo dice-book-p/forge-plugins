@@ -37,6 +37,12 @@ let round = A.startRound || 0
 const lightweight = A.lightweight === true
 if (lightweight) strength = 1
 
+// ── 모델 티어 (v5.1.1) — fan-out 비용 절감 ────────────────────────
+// Workflow agent()는 model 미지정 시 세션모델 상속 → opus 세션이면 전 fan-out이 opus(5~10x 비용).
+// 메인스레드(숙의·합성·갈등분석)는 이미 opus가 담당 → "opus 필요한 건 opus"는 메인 몫.
+// 스크립트 fan-out은 난이도별 고정: 판단=sonnet (verify는 dedup 없음).
+const MODEL = { standard: 'sonnet', mechanical: 'haiku' }
+
 // ── 검증 렌즈 (관점 분리) ─────────────────────────────────────────
 // 강도 = 동시 검증자 수. 렌즈 풀에서 strength개 선택, 부족하면 순환.
 const LENS_POOL = A.lenses || [
@@ -151,6 +157,7 @@ while (round < convergenceMax) {
         label: `verify:r${round + 1}:${lens.slice(0, 10)}`,
         phase: 'Verify',
         schema: VERIFIER_SCHEMA,
+        model: MODEL.standard,
       })
     )
   )
@@ -168,7 +175,7 @@ while (round < convergenceMax) {
     findings.map(f => () =>
       parallel(
         Array.from({ length: REFUTERS }, () => () =>
-          agent(refutePrompt(f), { label: `refute:${f.location}`, phase: 'Refute', schema: REFUTE_SCHEMA })
+          agent(refutePrompt(f), { label: `refute:${f.location}`, phase: 'Refute', schema: REFUTE_SCHEMA, model: MODEL.standard })
         )
       ).then(votes => {
         const v = votes.filter(Boolean)

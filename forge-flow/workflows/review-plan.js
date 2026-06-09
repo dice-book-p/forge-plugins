@@ -36,6 +36,12 @@ let strength = A.strength || SCALE_DEFAULT_STRENGTH[scale] || 2
 const lightweight = A.lightweight === true
 if (lightweight) strength = 1
 
+// ── 모델 티어 (v5.1.1) — fan-out 비용 절감 ────────────────────────
+// Workflow agent()는 model 미지정 시 세션모델 상속 → opus 세션이면 전 fan-out이 opus(5~10x 비용).
+// 메인스레드(숙의·합성·갈등분석)는 이미 opus가 담당 → "opus 필요한 건 opus"는 메인 몫.
+// 스크립트 fan-out은 난이도별 고정: 판단=sonnet, 순수 텍스트 병합=haiku.
+const MODEL = { standard: 'sonnet', mechanical: 'haiku' }
+
 // ── 검증 관점 (plan judge panel) ──────────────────────────────────
 // 강도 = 동시 평가자 수. 관점풀에서 strength개 선택, 부족하면 순환.
 const PERSPECTIVE_POOL = A.perspectives || [
@@ -184,10 +190,11 @@ const raw = await parallel([
       label: `plan:${p.slice(0, 8)}`,
       phase: 'Judge',
       schema: VERIFIER_SCHEMA,
+      model: MODEL.standard,
     })
   ),
   // lightweight면 completeness critic 생략.
-  ...(lightweight ? [] : [() => agent(criticPrompt(), { label: 'plan:critic', phase: 'Critic', schema: VERIFIER_SCHEMA })]),
+  ...(lightweight ? [] : [() => agent(criticPrompt(), { label: 'plan:critic', phase: 'Critic', schema: VERIFIER_SCHEMA, model: MODEL.standard })]),
 ])
 const findings = raw.filter(Boolean).flatMap(r => r.findings || [])
 
@@ -201,7 +208,7 @@ log(`제기 ${findings.length}건 — 중복 병합`)
 let canonical = findings
 if (findings.length > 1) {
   const reworkBefore = findings.filter(f => f.severity === 'REWORK').length
-  const d = await agent(dedupPrompt(findings), { label: 'plan:dedup', phase: 'Dedup', schema: DEDUP_SCHEMA })
+  const d = await agent(dedupPrompt(findings), { label: 'plan:dedup', phase: 'Dedup', schema: DEDUP_SCHEMA, model: MODEL.mechanical })
   if (d && Array.isArray(d.merged) && d.merged.length > 0) canonical = d.merged
   // 안전망: dedup은 refute 상류 단일 에이전트(다수결 없음). REWORK 감소는 정상(중복 병합)일 수도,
   // 위험(서로 다른 REWORK 누락)일 수도 — 게이트 편향(결함 누락 위험)상 감소를 관측 가능하게 로깅.
@@ -216,7 +223,7 @@ const confirmed = (await parallel(
   canonical.map(f => () =>
     parallel(
       Array.from({ length: REFUTERS }, () => () =>
-        agent(refutePrompt(f), { label: `refute:${f.location}`, phase: 'Refute', schema: REFUTE_SCHEMA })
+        agent(refutePrompt(f), { label: `refute:${f.location}`, phase: 'Refute', schema: REFUTE_SCHEMA, model: MODEL.standard })
       )
     ).then(votes => {
       const v = votes.filter(Boolean)

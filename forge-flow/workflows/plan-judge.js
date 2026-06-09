@@ -45,6 +45,11 @@ function anglesFor(n) {
   return out
 }
 
+// ── 모델 티어 (v5.1.1) — fan-out 비용 절감 ────────────────────────
+// Workflow agent()는 model 미지정 시 세션모델 상속 → opus 세션이면 전 fan-out이 opus(5~10x 비용).
+// 최종 design 작성·합성은 메인스레드(opus)가 수행 → 초안 생성·채점 fan-out은 sonnet 고정.
+const MODEL = { standard: 'sonnet', mechanical: 'haiku' }
+
 // ── 스키마 ────────────────────────────────────────────────────────
 const DRAFT_SCHEMA = {
   type: 'object',
@@ -154,6 +159,7 @@ const drafts = (await parallel(
       label: `draft:${angle.key}`,
       phase: 'Draft',
       schema: DRAFT_SCHEMA,
+      model: MODEL.standard,
     }).then(d => (d ? { ...d, _angle: angle.key } : null))
   )
 )).filter(Boolean)
@@ -180,6 +186,7 @@ const judged = await parallel(
       label: `judge:${draft._angle}`,
       phase: 'Judge',
       schema: JUDGE_SCHEMA,
+      model: MODEL.standard,
     }).then(j => ({ idx, angle: draft._angle, judgement: j }))
   )
 )
