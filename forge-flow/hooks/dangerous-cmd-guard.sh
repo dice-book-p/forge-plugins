@@ -33,8 +33,14 @@ if printf '%s' "$CMD" | grep -qiE '(rm\s+(-[a-z]*r[a-z]*\s+-[a-z]*f|--recursive.
   exit 0
 fi
 
-# 민감 파일 수정 명령 검사
-if printf '%s' "$CMD" | grep -qE '(\.env|\.key|\.pem|credentials|secret|token)' && printf '%s' "$CMD" | grep -qE '(cat >|echo.*>|sed -i|tee|>>)'; then
+# 민감 파일 "수정" 명령 검사 — 쓰기 연산의 '대상' 파일명이 민감할 때만 차단.
+#   차단:   echo ... >> .env / cat > credentials.json / tee -a secret.key / sed -i ... token.txt
+#   비차단: ssh -i key.pem host 'cmd'  (키를 '읽기'만),  heredoc 본문에 경로만 등장 (대상은 비민감)
+# 리다이렉트(>,>>) 대상 또는 tee/sed -i 인자 파일명이 민감 토큰을 포함할 때만 deny.
+SENS='(\.env|\.key|\.pem|credentials|secret|token)'
+if printf '%s' "$CMD" | grep -qiE ">>?[[:space:]]*[\"']?[^ \"'|;&]*${SENS}" \
+   || printf '%s' "$CMD" | grep -qiE "tee([[:space:]]+-a)?[[:space:]]+[\"']?[^ \"'|;&]*${SENS}" \
+   || printf '%s' "$CMD" | grep -qiE "sed[[:space:]]+-i[^|;&]*${SENS}"; then
   echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"민감 파일 수정 감지: 사용자 확인이 필요합니다."}}'
   exit 0
 fi
