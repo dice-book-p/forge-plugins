@@ -51,9 +51,11 @@ const LENS_POOL = A.lenses || [
   '외과적 변경: 초과구현(gold-plating)·인접코드 침범·가정 위반·AC 소급불가 라인',
   'TDD·테스트: 신규 함수 테스트 존재/실효성(mock 과다)/테스트 계획 일치',
 ]
-function lensesFor(n) {
+// 라운드별 렌즈 회전: strength < 풀 크기일 때 clean 라운드마다 다른 렌즈로 교대 (같은 관점 반복 = 새 팀 교체 취지 무색).
+// REWORK 재진입은 round 유지 → 같은 렌즈가 수정본을 재검증 (의도된 동작).
+function lensesFor(n, offset) {
   const out = []
-  for (let i = 0; i < n; i++) out.push(LENS_POOL[i % LENS_POOL.length])
+  for (let i = 0; i < n; i++) out.push(LENS_POOL[(i + offset) % LENS_POOL.length])
   return out
 }
 
@@ -147,12 +149,12 @@ function refutePrompt(f) {
 log(`verify 시작 — 규모 ${scale}, 강도 ${strength}, 수렴상한 ${convergenceMax}, 시작라운드 ${round}`)
 
 while (round < convergenceMax) {
-  const lenses = lensesFor(strength)
+  const lenses = lensesFor(strength, round)
   log(`[라운드 ${round + 1}/${convergenceMax}] 검증자 ${lenses.length}명 (신규 팀 교체)`)
 
   // 렌즈별 독립 검증자 병렬 — 매 라운드 새 팀(이전 결과 미전달)
   const raw = await parallel(
-    lenses.map((lens, i) => () =>
+    lenses.map((lens) => () =>
       agent(verifierPrompt(lens), {
         label: `verify:r${round + 1}:${lens.slice(0, 10)}`,
         phase: 'Verify',

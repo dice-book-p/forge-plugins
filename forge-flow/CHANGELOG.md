@@ -1,5 +1,18 @@
 # forge-flow Changelog
 
+## v5.2.0 — chunk 모드 (M/L 분할 진행) + 검증 설정 질문 축소 + 렌즈 회전
+
+- **feat (quality/speed)**: **chunk 모드** — M/L 작업을 검증 가능한 S-등가 chunk 열로 분할해 chunk마다 계획(JIT)→구현→검수를 반복하는 진행 방식 추가 (plan 2.5단계, 사용자 승인 opt-in).
+  - 배경: L 일괄 진행은 design·diff 비대 → 검수 장기화 + REWORK 비수렴 (사용자 실사용 보고). 작은 diff는 검증 컨텍스트가 작아 수렴이 빠르고 결함이 chunk 경계에 갇힘.
+  - chunk 기준: AC 1~2개 / 변경 파일 ≤3 / 독립 검증 가능 / 위상 정렬 순서. **가능한 것까지만** 분할 — 강결합 잔여는 잔여 chunk 1개로 허용(⚠ 표시).
+  - 설계 분산: parent design엔 **chunk 경계표만**, 상세 계획은 chunk 착수 직전 JIT 작성(`### chunk 계획: {id}`, 10줄 내외). plan-judge·3-B work unit 분해·chunk별 review-plan 스킵. review-plan은 경계표에 1회.
+  - 검수 2층: **chunk verify**(chunk diff만 주입, lightweight·강도1·수렴1, PASS 시 자동 커밋) + **통합 verify**(전 chunk 완료 후 전체 diff 1회, 규모 기본 강도 — chunk 경계 간 결함 담당).
+  - REWORK 카운터는 기존 `rework_counts.verify`/`rework_lifetime.verify` 재사용 — chunk 간 누적으로 에스컬레이션 자동 동작.
+  - state 확장: `chunk_mode`, `chunks[]`, `current_chunk`.
+- **change (speed)**: plan 4단계 검증 설정 질문을 **AskUserQuestion 1회 묶음**으로 통합 (기존 4-A→4-B→4-C→4-D 순차 4회 왕복 → 1회 + 조건부 수렴 후속 1회). `lightweight=true` 또는 chunk 모드면 강도/수렴 질문 자체를 생략 (워크플로가 강도 1을 강제하므로 질문-답변 모순 제거).
+- **fix (quality)**: `verify.js` 렌즈 회전 — clean 라운드마다 렌즈 풀을 회전(`(i + round) % pool`)해 라운드별 다른 관점 적용. 기존엔 strength=1이면 수렴 라운드가 바뀌어도 항상 'AC 충족' 렌즈만 반복돼 "새 팀 교체" 취지가 무색했음. REWORK 재진입은 round 유지 → 같은 렌즈가 수정본 재검증(의도 유지). 비용 증가 0.
+- **affected**: `skills/plan/SKILL.md`, `skills/verify/SKILL.md`, `skills/complete/SKILL.md`, `workflows/verify.js`, `.claude-plugin/plugin.json`, `marketplace.json`
+
 ## v5.1.1 — Workflow fan-out 모델 티어링 (토큰 비용 핵심 누수 수정)
 
 - **fix (cost)**: 5개 워크플로 스크립트의 모든 `agent()` fan-out에 명시적 `model` 지정. Workflow `agent()`는 `model` 미지정 시 **세션 모델을 상속**하므로, opus 세션에서 forge-flow 실행 시 전 fan-out 검증자·구현자가 opus로 동작해 토큰 비용이 5~10배 폭증했다(v5.0/5.1 Agent팀→Workflow 마이그레이션이 기존 TeamCreate 경로의 `model:"sonnet"` 핀을 잃은 회귀).

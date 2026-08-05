@@ -126,6 +126,31 @@ design `## 검수 결과`에 `- verify: PASS (날짜)`, 상세는 `{task_id}.rev
 
 → 사용자 입력 없이 **즉시 `/forge-flow:test` 호출** (test 스킵조건이면 자동 스킵 → complete).
 
+## chunk 모드 (분할 진행 — plan 2.5단계 승인 시)
+
+상태 파일 `chunk_mode: true`면 verify는 두 층으로 동작한다. **작은 diff = 작은 검증 컨텍스트 = 빠른 수렴**이 목적 — chunk verify에서 REWORK가 나와도 수정 범위가 chunk diff 내부에 갇힌다.
+
+### A. chunk verify (chunk마다)
+
+1. 대상 = 상태 파일 `current_chunk`. 선행 검사는 §1과 동일하되 **§1-4/5(work unit 검사)는 스킵** (chunk 모드는 work units 미생성 — 경계표가 대체).
+2. 빌드 검증(§4) 동일.
+3. Workflow 호출(§5) — **args 스코핑이 핵심**:
+   - `designExcerpt`: **현재 chunk의 AC + 경계표 행(검증 기준) + `### chunk 계획: {id}` 섹션만**. 전체 design 주입 금지.
+   - `gitDiff`: **직전 chunk 완료 커밋 이후의 diff만** (`git diff {직전 chunk 커밋}..HEAD` + 미커밋 변경. 첫 chunk는 기능 브랜치 분기점 기준).
+   - `lightweight`: chunk 기준으로 4-A0 판정 (S-등가라 대부분 true), `strength: 1`, `convergenceMax: 1`, `startRound: 0`.
+4. verdict 라우팅:
+   - **PASS** → **chunk 완료 자동 커밋**: 해당 chunk의 writes만 `git add` 후 `git commit -m "{task_id} {chunk_id}: {chunk 한 줄 요약}"` (`.forge-flow/` 하위 제외 — complete와 동일 규칙). 상태 파일 갱신: `chunks[].status="done"`, `current_chunk`=다음 pending chunk, `rework_counts.verify`=0. design `## 검수 결과`에 `- verify({chunk_id}): PASS (날짜)` 기록. → **다음 chunk의 JIT 계획 작성으로** (plan SKILL 2.5단계). 남은 chunk 없으면 → B. 통합 verify.
+   - **REWORK** → §7 동일 (카운터도 동일: `rework_lifetime.verify`는 chunk 간 누적이므로 에스컬레이션이 자동 동작). 수정 범위는 chunk diff 내부로 한정.
+   - **CONCERNS** → §6 동일.
+
+### B. 통합 verify (전 chunk 완료 후 1회)
+
+chunk verify는 chunk 내부만 봤으므로, 통합 verify는 **chunk 경계 간 결함**(패턴 불일치·헬퍼/타입 중복 정의·시그니처 어긋남·AC 간 상호작용)을 잡는 최종 게이트다.
+
+- `designExcerpt`: 전체 design 발췌 (§5 기존과 동일), `gitDiff`: `git diff {base_branch 또는 분기점}...HEAD` 전체.
+- `strength`: 규모 기본 (M=1 / L=2), `convergenceMax`: 규모 기본, `lightweight: false`, `startRound`: 상태 파일 유지값.
+- verdict 라우팅·PASS 후 상태 기록·test 진행은 §6/§8 기존과 동일. REWORK 시 findings의 chunk 귀속을 판단해 해당 chunk 범위로 수정.
+
 ## Rework Log 관리
 
 > verify/test/complete가 공통 참조하는 규칙(test SKILL "rework-log 기록"·complete 회고가 본 절을 가리킴). REWORK 판정 시 `.forge-flow/rework-log.md`에 패턴 기록 → clarify/plan이 참조해 동일 실수 예방.

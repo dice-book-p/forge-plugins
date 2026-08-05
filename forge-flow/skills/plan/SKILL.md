@@ -82,9 +82,64 @@ design 문서의 영향 범위를 기반으로 기존 코드를 상세 분석합
 → 에이전트팀 구성을 권장합니다.
 ```
 
+### 2.5단계: 분할 판정 — chunk 모드 (M/L)
+
+확정 규모가 M/L이면, 전체를 한 번에 계획·구현·검수하는 대신 **검증 가능한 S-등가 chunk 열로 분할**할 수 있는지 판정한다.
+
+> **근거**: L 일괄 진행은 design·diff가 비대해져 검수 장기화 + REWORK 비수렴(검증자가 매번 대형 diff 전체를 재평가). chunk 분할은 diff·검증 컨텍스트를 작게 유지해 수렴이 빠르고, 결함이 chunk 경계 안에 갇힌다.
+
+**chunk 기준 (S-등가)** — 각 chunk가 모두 충족:
+- AC 1~2개 담당. 모든 AC는 정확히 하나의 chunk에 귀속 (커버리지 게이트와 동일한 집합 대조로 확인)
+- 변경 파일 ≤ 3 (writes 기준)
+- **독립 검증 가능**: chunk 완료 시점에 실행/관찰 가능한 검증 기준 존재 (뒤 chunk 완성을 전제하지 않음)
+- 선행 chunk 산출물에만 의존 (의존 그래프 위상 정렬 순서 준수)
+
+**분할 절차**: 1단계 탐색 요약(파일·호출 체인)을 근거로 AC를 위상 정렬 → 순서대로 위 기준을 만족하는 최소 묶음으로 그리디 분할. **가능한 것까지만** — 강결합이라 못 쪼개는 AC 군은 하나의 잔여 chunk로 묶는다(잔여 chunk는 기준 초과 허용, 표에 ⚠ 표시).
+
+**판정**: chunk 2개+ 도출 → 아래 승인 질문. chunk 1개(분할 불가) → 기존 일괄 흐름(3단계)으로.
+
+**AskUserQuestion 호출** (chunk 2+일 때 1회):
+```
+question: "작업을 {N}개 chunk로 분할해 chunk마다 계획→구현→검수를 반복할까요? chunk PASS마다 기능 브랜치에 자동 커밋됩니다."
+header: "분할 진행"
+options:
+  - label: "분할 진행 (Recommended)"
+    description: "chunk 경계표대로 순차 진행 — 작은 diff 단위 검수, 빠른 수렴"
+  - label: "일괄 진행"
+    description: "기존 M/L 흐름 (전체 계획 → 전체 구현 → 전체 verify)"
+multiSelect: false
+```
+
+**승인 시 기록**:
+1. design `## 구현 계획`에 **chunk 경계표만** 작성 (상세 계획은 각 chunk 착수 시 JIT):
+
+```markdown
+### chunk 경계표
+| chunk | 대상 AC | 파일 경계 (writes) | 검증 기준 | 의존 |
+|-------|---------|-------------------|----------|------|
+| C1 | AC-1 | src/a.ts | `npm test a` PASS | (없음) |
+| C2 | AC-2, AC-3 | src/b.ts, src/b.test.ts | `npm test b` PASS | [C1] |
+```
+
+2. 상태 파일에 chunk 큐 기록:
+```json
+{ "chunk_mode": true, "current_chunk": "C1",
+  "chunks": [ {"id": "C1", "acs": ["AC-1"], "status": "pending"} ] }
+```
+
+**chunk 모드에서의 후속 단계 변경** (아래 각 단계 본문보다 우선):
+- **3-0 plan-judge: 스킵** — chunk = S 등가, 해법 공간 좁음.
+- **3단계 상세 계획: chunk별 JIT** — 착수하는 chunk에 대해서만 design에 `### chunk 계획: {id}` 하위 섹션(따를 패턴·변경 순서·검증 방법, 10줄 내외)을 작성. 전체 상세 계획을 미리 만들지 않는다.
+- **3-B work unit 분해: 스킵** — chunk 경계표의 writes/검증 기준이 unit 역할을 대체. implement.js fan-out 불사용, chunk는 메인 단일 세션 구현이 기본.
+- **review-plan: 경계표에 대해 1회만** (L 필수·M 조건 판정은 기존과 동일). chunk별 JIT 계획은 S 취급으로 검수 생략.
+- **4단계 검증 설정: 축소** — chunk verify는 강도 1·수렴 1 고정(4-A/4-B 질문 생략). 통합 verify 강도는 규모 기본(M=1/L=2) 자동. 질문은 테스트 방식(4-C) + TDD(4-D)만 남으며 1회 AskUserQuestion에 묶는다.
+- **구현·검수 루프**: verify SKILL의 `## chunk 모드` 절차를 따른다 — chunk JIT 계획 → 구현 → chunk diff만 verify(lightweight) → PASS 시 자동 커밋 + 다음 chunk → 전 chunk 완료 시 통합 verify(전체 diff) → test 1회 → complete.
+
 ### 3단계: 구현 계획 작성
 
-#### 3-0단계: 계획안 생성 — judge panel (L 필수 · M·S 기본 스킵)
+> **chunk 모드면 이 단계는 chunk 착수 시마다 해당 chunk에 대해서만 축약 실행** (2.5단계 참조). 이하 본문은 일괄 흐름 기준.
+
+#### 3-0단계: 계획안 생성 — judge panel (L 필수 · M·S 기본 스킵 · chunk 모드 스킵)
 
 복잡한 작업은 메인이 단일 계획을 즉흥 작성하는 대신, **관점별 독립 계획안을 fan-out**하여 채점·합성한다(해법 공간이 넓을 때 단일 시도보다 우수). 비대화형이므로 Workflow로 위임한다(§대화형 경계 밖).
 
@@ -348,6 +403,9 @@ implement 권고: wave 2계층, 최대 너비 2 → 구현자 2명, W0 동시 2 
 ### 4단계: 검증 설정
 
 확정 규모를 기반으로 검증 강도, 수렴 라운드, 테스트 방식을 설정합니다.
+
+> **질문 묶음 (필수)**: 4-A/4-C/4-D 질문은 **AskUserQuestion 1회 호출에 묶는다** (1회 호출 최대 4질문 — clarify 3단계와 동일 규칙). 4-B(수렴)는 강도 답변에 조건부이므로 강도 2+ 선택 시에만 후속 1회. 순차 4회 호출 금지 — 사용자 왕복이 워크플로 최대 병목.
+> **질문 생략 규칙**: ① 4-A0 `lightweight=true` 판정 시 4-A/4-B 생략 (워크플로가 강도 1을 강제하므로 질문해도 무시됨 — 모순 방지). ② chunk 모드(2.5단계)면 4-A/4-B 생략 (chunk verify 1/1 고정, 통합 verify 규모 기본).
 
 #### 4-A0: 경량(lightweight) 판정 — 비용 floor (규모와 직교)
 
@@ -703,6 +761,7 @@ multiSelect: false
 
 ## 완료 후 다음 단계
 
+- **chunk 모드** → review-plan 판정(경계표 대상)이 필요하면 먼저 수행 후, **첫 chunk의 JIT 계획 작성 → 구현 → `/forge-flow:verify`(chunk verify)** 루프에 진입합니다. 이후 chunk 전환·통합 verify 라우팅은 verify SKILL `## chunk 모드`가 담당합니다.
 - **S, M(조건 미해당)** → 사용자의 추가 입력 없이 설계대로 **즉시 구현을 시작**합니다.
 - **M(조건 해당), L** → 사용자의 추가 입력 없이 **즉시 `/forge-flow:review-plan`을 호출**합니다.
 - **에이전트팀 구성 시** (wave 최대 너비 2+) → 사용자 승인 후 메인이 **`implement` 워크플로 호출**(wave 병렬 구현자 + reconciliation). 완료 verdict로 verify 진행 또는 blocked REWORK 라우팅. (위 "구현 실행 — implement Workflow" 참조)
