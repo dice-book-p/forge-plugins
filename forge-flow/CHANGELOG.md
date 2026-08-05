@@ -1,5 +1,15 @@
 # forge-flow Changelog
 
+## v5.2.1 — chunk 연결고리 계약 + 전이 그래프(flow.json) + 게이트 감사
+
+그래프 엔지니어링 2요소 적용: 제어흐름 명시화(G1) + 비용 게이트 counter-metric(G2). 더불어 chunk 분할 품질 우려(경계·chunk 간 연결) 보강.
+
+- **feat (quality)**: **chunk 연결고리(interface) 계약** — chunk 경계표에 `연결고리` 열 추가(선행 writes ∩ 후속 reads의 파일+심볼 시그니처). 선행 chunk 검증 기준에 인터페이스 검증 포함 의무화. JIT 계획 시 **커밋된 실제 코드에서 연결고리 실측**(추측 금지, 계약-실물 불일치 시 경계표 갱신+후속 재검토). chunk verify designExcerpt에 소비/공급 계약 주입.
+- **feat (quality)**: **분할 품질 게이트** (승인 전 기계 검사 4종) — AC 전단사 / 파일 겹침=의존 강제 / 의존↔연결고리 정합 / 검증 기준 독립성(후속 산출물 미전제). review-plan chunk 모드 관점 오버라이드 3종(경계 적절성·연결고리 완전성·검증 기준 독립성, 강도 3 고정) 추가.
+- **feat (G1, graph)**: **`flow.json`** — phase 허용 전이의 기계가독 단일 진실원 신설. `workflow-state.sh`가 프롬프트마다 관측 phase를 sidecar(`.forge-flow/state/.{task_id}.observed`)에 기록, 직전 관측과 달라지면 flow.json 에지와 대조 → 위반 시 `[FLOW⚠]` 경고 주입(비차단, 관측 우선). cross-turn 상태 꼬임(수동 편집·크래시·세션 재개)을 다음 프롬프트에서 조기 노출 — verify §1-6 사후 drift 검사를 보완하는 사전 방어. completed/cancelled 정리 시 sidecar 함께 삭제.
+- **feat (G2, graph)**: **게이트 감사 (counter-metric)** — complete 회고 4-B-2 신설: 이번 작업에서 발동한 비용 절감 게이트(lightweight·chunk 1/1·plan-judge/review-plan 스킵)별로 하류 REWORK가 "풀 강도였다면 잡았을 결함"인지 판정, 누출 시 rework-log `[프로세스] 게이트 과잉스킵: {게이트명}` 기록. plan 4-A0이 ×2+ 누적 시 해당 게이트 기본 판정을 보수화(개선 그래프 피드백 에지). 앵커=실제 REWORK 기록(검증자 수정 불가).
+- **affected**: `flow.json`(신규), `hooks/workflow-state.sh`, `skills/plan/SKILL.md`, `skills/verify/SKILL.md`, `skills/review-plan/SKILL.md`, `skills/complete/SKILL.md`
+
 ## v5.2.0 — chunk 모드 (M/L 분할 진행) + 검증 설정 질문 축소 + 렌즈 회전
 
 - **feat (quality/speed)**: **chunk 모드** — M/L 작업을 검증 가능한 S-등가 chunk 열로 분할해 chunk마다 계획(JIT)→구현→검수를 반복하는 진행 방식 추가 (plan 2.5단계, 사용자 승인 opt-in).

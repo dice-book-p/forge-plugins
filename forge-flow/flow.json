@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "description": "forge-flow phase 전이 그래프 — 허용 전이의 단일 진실원. workflow-state.sh가 관측된 전이를 이 그래프와 대조해 위반을 경고한다. SKILL의 phase 전이 서술과 불일치 시 이 파일이 우선하며, 새 전이 추가 시 여기와 해당 SKILL을 함께 갱신한다.",
+  "phases": {
+    "clarifying": ["reviewing-req", "cancelled"],
+    "reviewing-req": ["req-reviewed", "clarifying", "cancelled"],
+    "req-reviewed": ["planning", "clarifying", "cancelled"],
+    "planning": ["reviewing-plan", "implementing", "clarifying", "cancelled"],
+    "reviewing-plan": ["implementing", "planning", "clarifying", "cancelled"],
+    "implementing": ["verifying", "clarifying", "cancelled"],
+    "verifying": ["verified", "implementing", "clarifying", "cancelled"],
+    "verified": ["testing", "completing", "clarifying", "cancelled"],
+    "testing": ["tested", "awaiting_manual_result", "implementing", "clarifying", "cancelled"],
+    "awaiting_manual_result": ["testing", "tested", "implementing", "clarifying", "cancelled"],
+    "tested": ["completing", "clarifying", "cancelled"],
+    "completing": ["completed", "tested", "verified", "cancelled"],
+    "completed": [],
+    "cancelled": []
+  },
+  "notes": {
+    "clarifying-from-anywhere": "'추가 요구사항 반영'(clarify 시나리오 A)과 에스컬레이션(전역 상한·FAIL)은 대부분의 phase에서 clarifying으로 되돌릴 수 있다 — 각 phase의 전이 목록에 명시적으로 포함.",
+    "completing-rollback": "complete 1.5단계 merge 충돌/push 실패 시 tested(또는 test 미수행이면 verified)로 롤백.",
+    "terminal": "completed/cancelled은 종결 상태 — workflow-state.sh가 상태 파일을 정리한다."
+  }
+}

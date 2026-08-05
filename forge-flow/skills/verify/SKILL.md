@@ -135,7 +135,7 @@ design `## 검수 결과`에 `- verify: PASS (날짜)`, 상세는 `{task_id}.rev
 1. 대상 = 상태 파일 `current_chunk`. 선행 검사는 §1과 동일하되 **§1-4/5(work unit 검사)는 스킵** (chunk 모드는 work units 미생성 — 경계표가 대체).
 2. 빌드 검증(§4) 동일.
 3. Workflow 호출(§5) — **args 스코핑이 핵심**:
-   - `designExcerpt`: **현재 chunk의 AC + 경계표 행(검증 기준) + `### chunk 계획: {id}` 섹션만**. 전체 design 주입 금지.
+   - `designExcerpt`: **현재 chunk의 AC + 경계표 행(검증 기준·연결고리) + `### chunk 계획: {id}` 섹션만**. 전체 design 주입 금지. **연결고리 계약을 반드시 포함** — ① 이 chunk가 소비하는 선행 인터페이스(시그니처대로 사용했나), ② 이 chunk가 후속에 내보내는 인터페이스(경계표 계약대로 export했나)를 검증자가 대조하도록.
    - `gitDiff`: **직전 chunk 완료 커밋 이후의 diff만** (`git diff {직전 chunk 커밋}..HEAD` + 미커밋 변경. 첫 chunk는 기능 브랜치 분기점 기준).
    - `lightweight`: chunk 기준으로 4-A0 판정 (S-등가라 대부분 true), `strength: 1`, `convergenceMax: 1`, `startRound: 0`.
 4. verdict 라우팅:

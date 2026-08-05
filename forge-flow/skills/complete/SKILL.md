@@ -180,6 +180,19 @@ REWORK 이력에서 교훈을 추출하여 `.forge-flow/rework-log.md`에 기록
 3. **요구사항 해석**: clarify에서 모호하게 작성된 AC가 verify/test까지 전파되었다면 → `[요구사항]` 태그로 기록
 4. **환경/도구 제약**: test에서 환경 의존적 이슈가 발생했다면 → `[환경]` 태그로 기록
 
+#### 4-B-2. 게이트 감사 (counter-metric — 비용 최적화 루프 감시)
+
+lightweight·chunk verify(1/1)·plan-judge 스킵·review-plan 스킵은 전부 **비용 절감 게이트**입니다. 이 게이트들이 과잉 발동하면 결함이 하류로 누출됩니다 — 감시 짝이 없으면 아무도 모릅니다. 회고 시 다음을 점검:
+
+1. **이번 작업에서 발동한 절감 게이트 나열** (상태 파일·design에서 확인): lightweight 판정, chunk 모드, plan-judge 스킵, review-plan 스킵/축소.
+2. **누출 판정**: 하류(통합 verify·test·사용자 보고)에서 나온 REWORK 결함 각각에 대해 — "스킵/경량화된 게이트가 풀 강도였다면 잡았을 결함인가?"를 판정.
+   - 예: chunk verify(강도1)가 놓친 패턴 불일치를 통합 verify가 잡음 → chunk verify 경량화의 정상 트레이드오프 (기록 불필요 — 통합 verify가 설계된 안전망).
+   - 예: lightweight 판정된 작업에서 API 계약 결함이 test에서 발견 → **lightweight 오판정** (API 계약 변경은 lightweight 배제 조건인데 판정 누락) → 기록 대상.
+3. **기록**: 누출 확인 시 rework-log에 `[프로세스]` 태그로 기록 — 형식: `게이트 과잉스킵: {게이트명} — {놓친 결함 유형}`.
+4. **앵커 원칙**: 판정 근거는 실제 발생한 REWORK 기록(review.md)만 사용. 검증자·워크플로는 rework-log의 이 항목을 수정할 수 없음(complete 회고 전용 기록).
+
+> **소비처**: plan 4-A0이 rework-log의 `게이트 과잉스킵` ×2+ 항목을 읽어 해당 게이트 판정을 보수화합니다 (개선 그래프의 피드백 에지).
+
 > 이번 워크플로에서 해당 사항이 없으면 이 하위 단계를 스킵합니다.
 
 #### 4-C. rework-log 예외 처리

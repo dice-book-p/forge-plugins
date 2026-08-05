@@ -95,7 +95,7 @@ if ls .forge-flow/state/*.json 1>/dev/null 2>&1; then
         SF_DESIGN=$(_json_read '.design_file' "$sf")
         [ -n "$SF_DESIGN" ] && [ -f "$SF_DESIGN" ] && rm -f "$SF_DESIGN"
       fi
-      rm -f "$sf"
+      rm -f "$sf" ".forge-flow/state/.$(basename "$sf" .json).observed"
     fi
   done
 fi
@@ -131,6 +131,31 @@ if [ -n "$BOUND_STATE" ]; then
   if [ -n "$WORK_DIR" ] && [ "$WORK_DIR" != "null" ]; then
     WORK_DIR_CTX=" [WORKTREE] 작업 디렉토리: ${WORK_DIR}. 파일 읽기/수정은 ${WORK_DIR}/ 경로 사용. git 명령: git -C ${WORK_DIR}."
   fi
+
+  # phase 전이 관측·검증 (flow.json = 허용 전이 단일 진실원) — 위반은 경고만(비차단).
+  # 훅이 프롬프트마다 관측한 phase를 sidecar에 기록, 직전 관측과 달라졌으면 flow.json 에지와 대조.
+  # cross-turn drift(수동편집·크래시·세션재개로 phase가 그래프 밖 경로로 점프)를 다음 프롬프트에서 조기 노출.
+  PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  FLOW_JSON="${PLUGIN_ROOT}/flow.json"
+  OBS_FILE=".forge-flow/state/.${TASK_ID}.observed"
+  if [ -f "$FLOW_JSON" ] && [ -f "$OBS_FILE" ]; then
+    LAST_PHASE=$(cat "$OBS_FILE" 2>/dev/null)
+    if [ -n "$LAST_PHASE" ] && [ "$LAST_PHASE" != "$PHASE" ]; then
+      if command -v jq >/dev/null 2>&1; then
+        ALLOWED=$(jq -r --arg f "$LAST_PHASE" --arg t "$PHASE" '.phases[$f] // [] | contains([$t])' "$FLOW_JSON" 2>/dev/null)
+      else
+        ALLOWED=$(python3 -c "
+import json
+d=json.load(open('$FLOW_JSON'))
+print('true' if '$PHASE' in d.get('phases',{}).get('$LAST_PHASE',[]) else 'false')
+" 2>/dev/null)
+      fi
+      if [ "$ALLOWED" != "true" ]; then
+        WORK_DIR_CTX="${WORK_DIR_CTX} [FLOW⚠] 전이 위반 감지: ${LAST_PHASE}→${PHASE}는 flow.json 허용 에지가 아닙니다. 상태 파일이 수동 편집·크래시·세션 재개로 꼬였을 수 있습니다 — phase와 실제 산출물(design 검수 결과·git diff)을 대조해 올바른 phase로 정정한 뒤 진행하세요."
+      fi
+    fi
+  fi
+  printf '%s' "$PHASE" > "$OBS_FILE" 2>/dev/null
 
   case "$PHASE" in
     clarifying)

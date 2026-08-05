@@ -96,7 +96,18 @@ design 문서의 영향 범위를 기반으로 기존 코드를 상세 분석합
 
 **분할 절차**: 1단계 탐색 요약(파일·호출 체인)을 근거로 AC를 위상 정렬 → 순서대로 위 기준을 만족하는 최소 묶음으로 그리디 분할. **가능한 것까지만** — 강결합이라 못 쪼개는 AC 군은 하나의 잔여 chunk로 묶는다(잔여 chunk는 기준 초과 허용, 표에 ⚠ 표시).
 
-**판정**: chunk 2개+ 도출 → 아래 승인 질문. chunk 1개(분할 불가) → 기존 일괄 흐름(3단계)으로.
+**연결고리(interface) 도출** — chunk 간 계약을 명시한다:
+- chunk N의 연결고리 = **선행 chunk들의 writes ∩ chunk N의 reads** (파일 단위) + 그 파일에서 소비하는 **심볼 시그니처**(함수/타입/API 계약).
+- 도출 근거는 탐색 요약의 호출 체인. 추정 불가 시 사용자에게 질문(빈 칸으로 승인 진행 금지).
+- 연결고리는 **후속 chunk가 전제하는 계약**이므로, 선행 chunk의 검증 기준에 해당 인터페이스 검증이 포함돼야 한다(예: C1 검증 기준에 "export 시그니처가 경계표와 일치" 포함).
+
+**분할 품질 게이트 (기계 검사 — 승인 질문 전 필수)**: 판단이 아닌 집합 대조. 하나라도 걸리면 재분할 후 재검사:
+1. **AC 전단사**: 모든 AC가 정확히 하나의 chunk에 귀속 (누락·중복 귀속 → 차단).
+2. **파일 겹침 = 의존 강제**: 두 chunk의 writes가 같은 파일을 포함하면 반드시 둘 사이 의존 순서 존재 (없으면 경계 재조정 — 순서 없는 동일 파일 쓰기는 chunk 커밋 diff 경계를 오염).
+3. **의존 ↔ 연결고리 정합**: 의존이 선언됐는데 연결고리가 공란이면 의심 플래그(왜 의존?) / 연결고리가 있는데 의존 미선언이면 차단(순서 위반 시 stale 계약).
+4. **검증 기준 실행 가능성**: 각 chunk 검증 기준이 그 시점까지 커밋된 코드만으로 실행 가능한가 (뒤 chunk 산출물 참조 시 차단).
+
+**판정**: chunk 2개+ 도출 → 게이트 통과 후 아래 승인 질문. chunk 1개(분할 불가) → 기존 일괄 흐름(3단계)으로.
 
 **AskUserQuestion 호출** (chunk 2+일 때 1회):
 ```
@@ -115,10 +126,10 @@ multiSelect: false
 
 ```markdown
 ### chunk 경계표
-| chunk | 대상 AC | 파일 경계 (writes) | 검증 기준 | 의존 |
-|-------|---------|-------------------|----------|------|
-| C1 | AC-1 | src/a.ts | `npm test a` PASS | (없음) |
-| C2 | AC-2, AC-3 | src/b.ts, src/b.test.ts | `npm test b` PASS | [C1] |
+| chunk | 대상 AC | 파일 경계 (writes) | 연결고리 (선행 계약 소비) | 검증 기준 | 의존 |
+|-------|---------|-------------------|------------------------|----------|------|
+| C1 | AC-1 | src/a.ts | (없음) | `npm test a` PASS + export 시그니처 `parseFoo(x: Raw): Foo` 일치 | (없음) |
+| C2 | AC-2, AC-3 | src/b.ts, src/b.test.ts | src/a.ts: `parseFoo(x: Raw): Foo` | `npm test b` PASS | [C1] |
 ```
 
 2. 상태 파일에 chunk 큐 기록:
@@ -130,8 +141,9 @@ multiSelect: false
 **chunk 모드에서의 후속 단계 변경** (아래 각 단계 본문보다 우선):
 - **3-0 plan-judge: 스킵** — chunk = S 등가, 해법 공간 좁음.
 - **3단계 상세 계획: chunk별 JIT** — 착수하는 chunk에 대해서만 design에 `### chunk 계획: {id}` 하위 섹션(따를 패턴·변경 순서·검증 방법, 10줄 내외)을 작성. 전체 상세 계획을 미리 만들지 않는다.
+  - **연결고리 실측 원칙 (필수)**: 선행 chunk가 있으면 JIT 계획 작성 전 **커밋된 실제 코드에서 연결고리 인터페이스를 직접 읽어**(Read/Grep) 시그니처를 확인하고 계획에 인용한다. 경계표의 계약과 실제 코드가 다르면(선행 chunk가 계약과 다르게 구현) → 즉시 보고: 경계표 갱신 + 영향 후속 chunk 재검토. **경계표 기억이나 추측으로 계획 금지** — 순차 chunk의 장점은 선행 산출물이 실물이라는 것.
 - **3-B work unit 분해: 스킵** — chunk 경계표의 writes/검증 기준이 unit 역할을 대체. implement.js fan-out 불사용, chunk는 메인 단일 세션 구현이 기본.
-- **review-plan: 경계표에 대해 1회만** (L 필수·M 조건 판정은 기존과 동일). chunk별 JIT 계획은 S 취급으로 검수 생략.
+- **review-plan: 경계표에 대해 1회만** (L 필수·M 조건 판정은 기존과 동일). chunk별 JIT 계획은 S 취급으로 검수 생략. 호출 시 args에 **분할 검증 관점을 오버라이드**한다 (review-plan SKILL §4의 chunk 모드 관점 참조 — 경계 적절성·연결고리 완전성·검증 기준 독립성).
 - **4단계 검증 설정: 축소** — chunk verify는 강도 1·수렴 1 고정(4-A/4-B 질문 생략). 통합 verify 강도는 규모 기본(M=1/L=2) 자동. 질문은 테스트 방식(4-C) + TDD(4-D)만 남으며 1회 AskUserQuestion에 묶는다.
 - **구현·검수 루프**: verify SKILL의 `## chunk 모드` 절차를 따른다 — chunk JIT 계획 → 구현 → chunk diff만 verify(lightweight) → PASS 시 자동 커밋 + 다음 chunk → 전 chunk 완료 시 통합 verify(전체 diff) → test 1회 → complete.
 
@@ -420,6 +432,8 @@ implement 권고: wave 2계층, 최대 너비 2 → 구현자 2명, W0 동시 2 
 - 변경 표면 작음 (대략 work unit ≤ 3, 단일 모듈)
 
 하나라도 불충족 → `lightweight=false`(기본, 보수적). **확신 없으면 false**(게이트 = 누락 위험 회피).
+
+**게이트 보수화 (counter-metric 소비)**: rework-log에 `[프로세스] 게이트 과잉스킵: {게이트명}` 항목이 **×2 이상**이면 해당 게이트 기본 판정을 한 단계 보수화한다 — lightweight면 판정을 false로 강제(사유 보고), chunk verify면 강도 1→2, plan-judge/review-plan 스킵이면 실행으로 전환. 사용자에게 근거(rework-log 항목)와 함께 보고. (complete 4-B-2 게이트 감사가 기록하는 항목의 소비처 — 절감 게이트가 스스로 완화되기만 하고 감시받지 않는 것을 막는 개선 그래프 에지.)
 
 **효과** (review-req/review-plan/verify args에 `lightweight: true` 주입 시):
 - 관점 1개로 축소 + completeness critic 생략 + refuter 1명 → fan-out 비용 대폭 절감(17→~3 에이전트).

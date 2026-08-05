@@ -68,6 +68,16 @@ Workflow({
 })
 ```
 
+> **chunk 모드 (상태 파일 `chunk_mode: true`)**: 검증 대상은 상세 계획이 아니라 **chunk 경계표**다. args에 `perspectives` 오버라이드를 추가 주입:
+> ```
+> perspectives: [
+>   "경계 적절성: 각 chunk가 S-등가 기준(AC 1~2·파일≤3·독립 검증)을 충족하나, 잔여 chunk(⚠)의 강결합 사유가 타당한가, 더 쪼갤 수 있는 chunk는 없나",
+>   "연결고리 완전성: chunk 간 의존마다 인터페이스 계약(파일+시그니처)이 명시됐나, 선행 chunk 검증 기준이 그 계약 검증을 포함하나, 누락된 chunk 간 결합(경계표에 없는 파일 접점)은 없나 — 저장소 직접 Read로 확인",
+>   "검증 기준 독립성: 각 chunk 검증 기준이 그 시점까지의 커밋만으로 실행 가능한가(후속 chunk 산출물 전제 시 위반), AC가 chunk 검증 기준+통합 verify로 완전 커버되나"
+> ]
+> ```
+> 강도는 chunk 수와 무관하게 **3 고정**(관점 3개 각 1명). 경계표는 짧아 fan-out 비용 낮음.
+
 > **이 스킬은 위 Workflow를 반드시 호출한다** (opt-in 충족: 스킬 지시문 경로).
 > Workflow는 판정만 반환 — judge panel(구현가능성/AC커버리지/전파) + completeness critic 병렬 → dedup 배리어 → finding당 적대적 확정(엄격 과반 반박만 폐기, 불확실=결함유지) → verdict.
 > 완료 `<task-notification>` 수신 = verdict 도착 신호.
