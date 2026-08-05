@@ -75,6 +75,28 @@ if [ "$PHASE" = "verified" ] || [ "$PHASE" = "tested" ] || [ "$PHASE" = "complet
   exit 0
 fi
 
+# 3.5 백그라운드 워크플로 진행 중이면 통과 (forge-flow v5 Workflow = 비동기 백그라운드)
+# 최근 3분 내 워크플로 journal 갱신 = 검증자 활동 중 → 정당한 대기, 차단 안 함
+if [ -n "$SESSION_ID" ]; then
+  _FF_SLUG=$(printf '%s' "$PWD" | sed 's/[^a-zA-Z0-9]/-/g')
+  _FF_WFDIR="$HOME/.claude/projects/$_FF_SLUG/$SESSION_ID/subagents/workflows"
+  if [ -d "$_FF_WFDIR" ] && [ -n "$(find "$_FF_WFDIR" -name 'journal.jsonl' -mmin -3 2>/dev/null)" ]; then
+    exit 0
+  fi
+fi
+
+# 3.6 headless 질문 릴레이 대기 중이면 통과 (v5.3 interaction mode)
+# [FF-ASK]/호스트 릴레이 발행 후 턴 종료 = 사용자 답 대기 — awaiting_manual_result와 같은 정당한 일시정지.
+# 여기서 차단하면 모델이 답 없이 진행을 강요받아 릴레이 프로토콜이 깨진다.
+if command -v jq >/dev/null 2>&1; then
+  PENDING_GATE=$(jq -r '.pending_question.gate // empty' "$STATE_FILE" 2>/dev/null)
+else
+  PENDING_GATE=$(python3 -c "import json; print(json.load(open(\"$STATE_FILE\")).get('pending_question',{}).get('gate',''))" 2>/dev/null)
+fi
+if [ -n "$PENDING_GATE" ] && [ "$PENDING_GATE" != "null" ]; then
+  exit 0
+fi
+
 # 4. Circuit breaker — phase별 stop_count (phase 전진 시 재무장, phase당 1회 강제통과)
 # 기존 버그: 3회 도달 시 stop_count=0 리셋 → 매 3회마다 미완료 작업이 전역 반복 탈출.
 # 수정: 리셋 제거 + phase별 카운터. phase가 전진(=진짜 진행)해야만 재무장.

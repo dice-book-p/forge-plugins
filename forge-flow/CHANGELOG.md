@@ -12,7 +12,9 @@
   - **에스컬레이션**: 자동 재진입 금지(무한루프 방지) — 보고 후 중단.
 - **feat**: **질문 릴레이 프로토콜** — 호스트 지시 형식 우선(봇 ask 마커 등), 없으면 `[FF-ASK]` 마커. state `pending_question` 기록 → 훅이 다음 프롬프트에 `[FF-ASK 대기]` 주입 → 다음 사용자 입력을 답으로 해석해 게이트 재개.
 - **feat**: headless 첫 실행 부트스트랩 폴백(질문 생략, 기본 config 생성) + complete 보고에 auto_decisions·headless 가정 전체 표시 의무(사후 검토로 뒤집기 가능).
-- **affected**: `skills/clarify/SKILL.md`, `skills/complete/SKILL.md`, `hooks/workflow-state.sh`
+- **fix**: **stop-guard × 질문 릴레이 갭** — `pending_question` 존재 시 Stop 통과 (답 대기 = awaiting_manual_result와 같은 정당한 일시정지. 차단하면 모델이 답 없이 진행을 강요받아 릴레이 프로토콜 붕괴).
+- **fix**: 설치본에서 라이브 개선된 훅 2건을 브랜치로 역이식 (유실 방지) — stop-guard "백그라운드 워크플로 진행 중 통과"(3분 내 journal 갱신 감지), dangerous-cmd-guard 민감파일 검사 정밀화(쓰기 '대상' 파일명 기준 — ssh -i key.pem 등 읽기 오탐 제거).
+- **affected**: `skills/clarify/SKILL.md`, `skills/complete/SKILL.md`, `hooks/workflow-state.sh`, `hooks/stop-guard.sh`, `hooks/dangerous-cmd-guard.sh`
 
 ## v5.2.3 — 토큰 절감 3종(탐색팀 축소·verify dedup·죽은무게 제거) + 강도 재배분
 
