@@ -225,3 +225,5 @@ multiSelect: false
   design: {삭제 / 유지}
   워크플로 파일 정리 완료
 ```
+
+> **headless 진행분 보고 (필수)**: 상태 파일에 `auto_decisions`가 있으면 완료 보고에 전체 목록(게이트·채택값·근거)과 design의 headless 가정을 포함한다 — 사용자가 사후 검토로 뒤집을 수 있어야 함 (clarify SKILL `## 상호작용 모드 (공통)` 참조).

@@ -132,6 +132,18 @@ if [ -n "$BOUND_STATE" ]; then
     WORK_DIR_CTX=" [WORKTREE] 작업 디렉토리: ${WORK_DIR}. 파일 읽기/수정은 ${WORK_DIR}/ 경로 사용. git 명령: git -C ${WORK_DIR}."
   fi
 
+  # 상호작용 모드 주입 (config interaction_mode=headless면 전 스킬에 게이트 처리 규칙 전달)
+  IMODE=""
+  [ -f ".forge-flow/config.json" ] && IMODE=$(_json_read '.interaction_mode' ".forge-flow/config.json")
+  if [ "$IMODE" = "headless" ]; then
+    WORK_DIR_CTX="${WORK_DIR_CTX} [INTERACTION] headless 모드 — AskUserQuestion 호출 금지. clarify/SKILL.md '상호작용 모드 (공통)' 규칙 적용: 결정 게이트=Recommended 자동 채택+auto_decisions 기록 / 모호성=보수 해석 후 가정 명시 또는 질문 릴레이 / 파괴·비가역=보수 폴백 또는 릴레이 / 에스컬레이션=중단·보고."
+  fi
+  # 미응답 질문 대기 알림 (질문 릴레이 프로토콜)
+  PENDING_GATE=$(_json_read '.pending_question.gate' "$BOUND_STATE")
+  if [ -n "$PENDING_GATE" ] && [ "$PENDING_GATE" != "null" ]; then
+    WORK_DIR_CTX="${WORK_DIR_CTX} [FF-ASK 대기] 게이트 '${PENDING_GATE}'의 질문이 미응답 상태입니다. 이번 사용자 입력을 그 질문의 답으로 해석해 게이트를 재개하고 pending_question 필드를 제거하세요."
+  fi
+
   # chunk 진행 컨텍스트 (chunk_mode 작업이면 진행 n/m + 현재 chunk 표시)
   CHUNK_MODE=$(_json_read '.chunk_mode' "$BOUND_STATE")
   if [ "$CHUNK_MODE" = "true" ] || [ "$CHUNK_MODE" = "True" ]; then

@@ -40,9 +40,12 @@ description: "요구사항을 명확한 스펙으로 변환합니다. 사용자�
   "version": "1",
   "build_commands": { ... },
   "branch_strategy": { "base_branch": "...", "feature_pattern": "..." },
-  "propagation_chain": { ... }
+  "propagation_chain": { ... },
+  "interaction_mode": "interactive"
 }
 ```
+
+> `interaction_mode`: `"interactive"`(기본) | `"headless"` — `## 상호작용 모드 (공통)` 참조. **headless 환경에서의 첫 실행**(부트스트랩 질문 불가)이면 질문 생략하고 기본값 config를 생성한다: `build_commands` 미설정, `base_branch`=현재 repo 기본 브랜치(`git symbolic-ref refs/remotes/origin/HEAD` 또는 main), `interaction_mode: "headless"` 기록 + `auto_decisions`에 부트스트랩 자동 생성 기록.
 
 ### 스키마 마이그레이션
 
@@ -189,6 +192,40 @@ multiSelect: false
 **D. 기존 작업 없음** → 새 작업 생성 (아래 실행 흐름으로 직행)
 
 > 삭제된 design 파일은 git 히스토리에서 복원 가능합니다.
+
+## 상호작용 모드 (공통)
+
+> **전 스킬 공통 규칙.** forge-flow의 모든 AskUserQuestion 게이트에 적용된다. verify/test/plan/complete 등 다른 SKILL의 AskUserQuestion 지시는 본 규칙의 지배를 받는다.
+
+### 모드 결정
+
+1. `.forge-flow/config.json`의 `interaction_mode` 필드: `"interactive"`(기본) | `"headless"`.
+2. 미설정이어도 **AskUserQuestion 호출이 실패하면**(도구 부재·환경 에러) 그 세션은 즉시 `headless`로 전환하고 이후 재시도하지 않는다.
+3. 환경(호스트 봇·CI 래퍼)이 별도 질문 릴레이 형식을 프롬프트로 지시하면 **릴레이 가능 환경**으로 간주한다.
+
+`interactive`면 이하 무시하고 기존대로 AskUserQuestion 사용.
+
+### headless 게이트 처리 (등급별)
+
+| 등급 | 해당 게이트 | 처리 |
+|------|-----------|------|
+| **결정** (안전·기본값 존재) | 검증 설정(강도·수렴·테스트방식·TDD), 분할/병렬/unit/스펙/plan 승인, 작업 탐색("이어서 진행"), CONCERNS 수용, 부트스트랩 3필드 | **Recommended 자동 채택** + 상태 파일 `auto_decisions[]`에 `{gate, choice, 근거}` 기록. 진행 중단 없음 |
+| **모호성** (답 없이 진행 금지가 원칙) | clarify 2단계 재진술 확인, 3단계 해석 분기 질문 | 릴레이 가능 → 질문 릴레이. 불가 → **가장 보수적 해석 채택 + design `## 가정 (Assumptions)`에 "headless 가정: {해석} (미확인)" 명시** — review-req 검증자가 가정의 타당성을 검증하므로 오해석은 게이트에서 걸린다 |
+| **파괴/비가역** | complete merge/워크트리 폐기/design 삭제, cancel 확인, rework-log 영구 변경 | **자동 실행 금지.** 릴레이 가능 → 질문 릴레이. 불가 → 보수 폴백(안 하는 쪽): merge→PR 생성 또는 유지, 폐기→유지, design 삭제→유지, cancel→중단 보고 |
+| **에스컬레이션** | rework 전역 상한(≥6)·per-gate(≥3) | **자동 재진입 금지**(무한루프 위험) — 현 상태 보존 + 상황 보고 후 중단. 릴레이 가능하면 질문 릴레이 |
+
+> 커밋 게이트: 기능 브랜치 위 커밋은 가역적 → **결정 등급** (자동 커밋 + 기록). base branch 병합만 파괴 등급.
+
+### 질문 릴레이 프로토콜
+
+- 호스트가 형식을 지시하면(예: 봇의 ask 마커) **그 형식을 사용**한다.
+- 지시 없으면 응답 마지막에 `[FF-ASK] {질문 — 번호 선택지 포함}` 한 줄을 출력하고 턴을 끝낸다.
+- 릴레이 발행 시 상태 파일에 기록: `"pending_question": {"gate": "...", "question": "...", "options": [...]}`.
+- 다음 사용자 입력 수신 시: `pending_question`이 있으면 **그 입력을 답으로 해석**해 게이트를 재개하고 필드를 제거한다 (훅이 대기 중임을 매 프롬프트 알린다).
+
+### 완료 보고 의무
+
+headless로 진행된 작업의 완료(또는 중단) 보고에는 `auto_decisions` 전체와 headless 가정 목록을 반드시 포함한다 — 사용자가 사후 검토로 자동 결정을 뒤집을 수 있어야 한다.
 
 ## 탐색 에이전트팀 (공통)
 

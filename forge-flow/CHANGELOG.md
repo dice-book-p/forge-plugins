@@ -1,5 +1,19 @@
 # forge-flow Changelog
 
+## v5.3.0 — headless/CLI 상호작용 모드 (대화형 게이트의 무인 환경 대응)
+
+`claude -p`·CI·봇(Discord 등) 등 AskUserQuestion이 불가능한 환경에서도 워크플로 전 단계가 진행 가능하도록 상호작용 계층 도입.
+
+- **feat**: config `interaction_mode: "interactive"(기본) | "headless"` + **AskUserQuestion 실패 1회 감지 시 세션 내 자동 전환**. 훅이 매 프롬프트 `[INTERACTION]` 규칙을 주입해 **개별 SKILL 수정 없이** 전 게이트에 적용.
+- **feat**: 게이트 4등급 차등 처리 (clarify SKILL `## 상호작용 모드 (공통)` — 전 스킬 공통 규칙):
+  - **결정**(검증설정·승인류·CONCERNS): Recommended 자동 채택 + state `auto_decisions[]` 기록.
+  - **모호성**(요구 해석 질문): 자동 통과 금지 — 보수 해석 + design `## 가정`에 "headless 가정" 명시(review-req가 가정 검증으로 오해석 차단) 또는 질문 릴레이.
+  - **파괴/비가역**(merge·폐기·삭제·cancel): 자동 실행 금지 — 보수 폴백(PR/유지/중단) 또는 릴레이.
+  - **에스컬레이션**: 자동 재진입 금지(무한루프 방지) — 보고 후 중단.
+- **feat**: **질문 릴레이 프로토콜** — 호스트 지시 형식 우선(봇 ask 마커 등), 없으면 `[FF-ASK]` 마커. state `pending_question` 기록 → 훅이 다음 프롬프트에 `[FF-ASK 대기]` 주입 → 다음 사용자 입력을 답으로 해석해 게이트 재개.
+- **feat**: headless 첫 실행 부트스트랩 폴백(질문 생략, 기본 config 생성) + complete 보고에 auto_decisions·headless 가정 전체 표시 의무(사후 검토로 뒤집기 가능).
+- **affected**: `skills/clarify/SKILL.md`, `skills/complete/SKILL.md`, `hooks/workflow-state.sh`
+
 ## v5.2.3 — 토큰 절감 3종(탐색팀 축소·verify dedup·죽은무게 제거) + 강도 재배분
 
 - **perf (token)**: **탐색팀 기본 1명** — Explorer+Analyzer 2명 고정 → 탐색자(scout) 1명이 전 섹션 담당(요약 2KB 상한에 두 출력 포맷이 상호보완). L 규모 plan 상세 탐색만 2명 유지. 호출당 에이전트 1개·왕복 1회 절감 (~40-80k/작업).
