@@ -1,5 +1,14 @@
 # forge-flow Changelog
 
+## v5.2.3 — 토큰 절감 3종(탐색팀 축소·verify dedup·죽은무게 제거) + 강도 재배분
+
+- **perf (token)**: **탐색팀 기본 1명** — Explorer+Analyzer 2명 고정 → 탐색자(scout) 1명이 전 섹션 담당(요약 2KB 상한에 두 출력 포맷이 상호보완). L 규모 plan 상세 탐색만 2명 유지. 호출당 에이전트 1개·왕복 1회 절감 (~40-80k/작업).
+- **perf (token)**: **plan SKILL 죽은 무게 제거** (801→679줄) — TeamCreate 시대 잔재 절제: 중간 검수 A/B/C(task별 Spec 리뷰·50% 중간검수), 역할 정의(리더/구현자/리뷰어), agent_team 상태 스키마. implement 워크플로의 구조적 게이트(wave·dependsOn·reconciliation)가 대체. 병렬 구현 승인은 슬림 보고+1질문으로 축약. 이중 서술로 인한 구식 경로 선택 위험도 제거.
+- **perf (token)**: **verify dedup** — strength≥2 && findings>1일 때 haiku 텍스트 병합 배리어 추가(review-req 패턴 재사용). 복수 렌즈의 중복 제기 시 refute 비용 배가 방지. REWORK 감소 관측 로그 동일 적용.
+- **change (quality)**: **강도 재배분** — verify M 1→2 / review-req M 3→2 (총 에이전트 유지, 검출력을 후행 비용 큰 코드 검증으로 이동). verify.js 강도/수렴 맵 분리(기존 공유 맵은 강도 조정이 수렴 라운드를 오염).
+- **test**: verify.js 스모크런 (M 규모·심은 버그 픽스처, wf_334abc4a) — 렌즈 2 fan-out → 결함 검출 → **dedup 2→1 병합** → refute 2 실측 확정 → REWORK verdict. 5 에이전트/123k/84초, 모델 티어 준수(sonnet 4·haiku 1·opus 0).
+- **affected**: `skills/clarify/SKILL.md`, `skills/plan/SKILL.md`, `skills/verify/SKILL.md`, `skills/review-req/SKILL.md`, `workflows/verify.js`, `workflows/review-req.js`
+
 ## v5.2.2 — chunk 순서·우선순위 + 추적 강화 + AC 하위 분해 요구 재검증
 
 - **feat (ordering)**: chunk **실행 순서 규칙** 명문화 — 의존(위상 정렬) 절대 우선, 자유 슬롯은 사용자 지정 우선 AC → 연결고리 공급 많은 chunk(리스크 조기 소진) → 나머지. chunks[] 배열 순서 = 실행 순서. **진행 중 순서 변경·재분할 프로토콜**: 순서 변경은 의존 done 검사 후 재배열, 범위 변경은 품질 게이트 재검사 + (AC 변형 시) 경량 요구 재검증 + 재승인. done chunk 불변.

@@ -29,8 +29,9 @@ if (!A.designDoc || !String(A.designDoc).trim()) {
   throw new Error('review-req: designDoc 미주입 — 메인이 design 문서 전문을 args.designDoc로 주입해야 함.')
 }
 const scale = A.scale || 'M'
-const SCALE_DEFAULT_STRENGTH = { S: 1, M: 3, L: 4 }
-let strength = A.strength || SCALE_DEFAULT_STRENGTH[scale] || 3
+// v5.2.3 강도 재배분: M 3→2 — verify(코드 검증) M 1→2 증강과 상쇄해 총 에이전트 유지하며 검출력을 비싼 쪽(코드)으로 이동.
+const SCALE_DEFAULT_STRENGTH = { S: 1, M: 2, L: 4 }
+let strength = A.strength || SCALE_DEFAULT_STRENGTH[scale] || 2
 // 비용 floor: plan이 저위험 trivial 과제(순수로직·외부의존/API/DB/UI/보안 없음·테스트로 검증가능)로 판정 시 lightweight.
 // 규모(크기)와 직교한 복잡도 게이트 — 관점 1개 + critic 스킵 + refuter 1로 fan-out 비용 대폭 절감.
 // 기본 false(보수적). 게이트 편향(결함유지)은 유지: refuter 1이라도 불확실=결함유지.
@@ -187,7 +188,7 @@ log(`review-req 시작 — 규모 ${scale}, 관점 ${strength}개${lightweight ?
 
 const perspectives = perspectivesFor(strength)
 const raw = await parallel([
-  ...perspectives.map((p, i) => () =>
+  ...perspectives.map((p) => () =>
     agent(verifierPrompt(p), {
       label: `req:${p.slice(0, 8)}`,
       phase: 'Interrogate',

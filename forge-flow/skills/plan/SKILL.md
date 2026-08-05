@@ -32,8 +32,8 @@ design 문서의 영향 범위를 기반으로 기존 코드를 상세 분석합
    **2-a. 원칙**: 메인이 직접 LSP/grep/Glob으로 상세 분석을 하지 않는다. 규모 무관 **항상** 탐색 팀에 위임하여 요약만 리턴 받는다 (메인 컨텍스트 오염 방지).
 
    **2-b. 호출 내용**:
-   - **Explorer**: 파일·심볼 탐색 (grep/Glob/Read로 design 영향 범위 내 파일 식별)
-   - **Analyzer**: 영향 범위(호출 체인) + 기존 패턴(네이밍·에러처리·테스트) 분석
+   - **탐색자(scout) 1명 (기본)**: 파일·심볼 탐색 + 영향 범위(호출 체인) + 기존 패턴(네이밍·에러처리·테스트) 분석을 단독 수행
+   - **L 규모만**: Analyzer 1명 추가 (탐색자=파일 목록 / Analyzer=영향·패턴·리스크 분담)
    - 출력 포맷: **"plan 1단계 (상세)"** 블록을 리턴 받음
      ```
      [파일 목록]
@@ -260,68 +260,9 @@ design 문서의 `## 구현 계획` 섹션에 추가(judge panel 적용 시 위 
 > - **wave = 병렬 실행 계층.** 같은 wave의 unit은 병렬 안전(동시 구현 가능), wave 간은 순차. 도출 규칙은 3-B 5단계 참조.
 > - **단위검증 게이트(순차)**: implement는 의존 후속 unit 착수 직전 직전 unit의 검증방식을 실행하여 PASS면 진행, FAIL이면 의존 후속 unit 차단(독립 unit은 계속). wave(병렬)와 직교 — wave는 *동시 착수 가능 여부*, 단위검증은 *착수 전 선행 PASS 요건*.
 
-### 중간 검수 (L규모 필수, M규모 선택)
-
-#### A. task별 Spec compliance 리뷰 (L규모 필수)
-
-에이전트팀 구현 시, **각 태스크 완료 직후** 경량 Spec compliance 리뷰를 수행합니다. 전체 verify 전에 요구사항 드리프트를 조기 포착합니다.
-
-**리뷰 방식**: 태스크 완료 보고 수신 후, 리더가 fresh agent 1명을 spawn하여 Spec 리뷰:
-
-```
-Agent(
-  name: "spec-reviewer-{task번호}",
-  prompt: "당신은 Spec compliance 리뷰어입니다.
-    구현자 보고를 신뢰하지 마세요. 코드를 직접 읽고 검증합니다.
-    
-    ## 이 태스크의 요구사항
-    {해당 태스크 담당 AC 항목}
-    
-    ## 변경 내용
-    {해당 태스크의 git diff}
-    
-    ## 검증 항목
-    1. 누락: 요청한 것을 구현했는가?
-    2. 초과: 요청하지 않은 것을 추가했는가?
-    3. 오해: 다른 방식으로 해석했는가?
-    
-    판정: ✅ Spec compliant / ❌ Issues found [구체적 목록]",
-  model: "sonnet"
-)
 ```
 
-- ✅ → 다음 태스크 진행
-- ❌ → 해당 구현자에게 이슈 전달 → 수정 후 재리뷰 → 통과 시 다음 태스크
-
-> **비용 판단**: L규모(태스크 5개+)에서 task별 리뷰 비용 < 전체 verify 재작업 비용. 조기 발견이 효과적.
-
-#### B. 진행률 50% 중간 검수 (L규모 필수)
-
-구현 진행률 50% 시점에서 에이전트팀 1명을 spawn하여 외부 중간 검수를 수행합니다.
-현재까지의 diff를 AC + '따를 기존 패턴' 기준으로 검수합니다.
-
-**중간 검수 절차**:
-1. `TeamCreate`: `{ "team_name": "mid-check-{task_id}", "description": "중간 검수" }`
-2. `TaskCreate`로 검수 작업 생성
-3. `Agent` 도구 + `team_name` + `name: "중간검수자"` + `model: "sonnet"`
-4. 검수자에게 현재까지의 `git diff`, design 문서, '따를 기존 패턴' 테이블 전달
-5. 결과 수신 → `SendMessage`로 종료 → `TeamDelete`
-
-**판정**:
-- PASS → 계속 구현
-- REWORK → 피드백 기반 수정 후 계속 구현
-- 빌드 검증은 생략 (최종 verify에서 수행)
-
-#### C. M규모 선택적 적용
-
-M규모에서는 task별 Spec compliance 리뷰를 **선택적으로** 적용합니다:
-- 태스크 수 3개 이상이고, 태스크 간 의존성이 있으면 → 적용 권장
-- 태스크 수 2개 이하 또는 독립적이면 → 생략 (최종 verify로 충분)
-```
-
-> `중간 검수` 섹션은 **L규모에서 필수**, M규모에서 선택입니다. S규모에서는 생략.
-
-> **단위검증 게이트와의 역할 분리**: 위 `중간 검수`(task별 Spec compliance 리뷰 / 50% 중간 검수)는 **사후 외부 교차검증**(에이전트팀 외부자가 구현 결과를 점검)이고, 아래 **3-B단계의 work unit 단위검증 게이트**는 **사전 자체 단위검증**(구현자 본인이 다음 unit 착수 직전에 직전 unit의 검증방식을 실행)입니다. 두 게이트는 목적·시점·주체가 다르므로 함께 사용해도 중복이 아닙니다.
+> 중간 검수(구 task별 Spec compliance 리뷰·50% 중간 검수)는 **v5.2.3에서 폐지** — implement 워크플로의 wave별 reconciliation(④ 체계적 오류 spot-check)과 verify 게이트가 그 역할을 대체한다. chunk 모드에서는 chunk verify가 동일 역할.
 
 ### 3-B단계: work unit 분해 + 검증방식·의존 그래프 자동 제안 (M/L 규모)
 
@@ -471,7 +412,7 @@ implement 권고: wave 2계층, 최대 너비 2 → 구현자 2명, W0 동시 2 
 
 **규모별 기본 추천**:
 - S → 표준(1) 추천
-- M → 표준(1) 추천
+- M → 강화(2) 추천 (v5.2.3 재배분 — 코드 검증 렌즈 2개)
 - L → 강화(2) 추천
 
 **AskUserQuestion 호출**:
@@ -665,66 +606,20 @@ L → review-plan 실행 (필수)
 3. 그 외 (wave 최대 너비 2+) → 에이전트팀 구성
 ```
 
-#### 팀 구성 분석 — wave 소비 (독립성 재판정 금지)
+#### 병렬 구현 승인 (wave 소비 — 독립성 재판정 금지)
 
-**병렬 작업 단위 = 3-B 5단계 wave 분해 결과를 그대로 사용한다.** 여기서 독립성을 다시 분석하지 않는다(wave가 이미 `writes` 비충돌 + 무의존으로 결정론 계산함). 팀 규모·구조는 wave에서 도출:
-
-- **구현자 수 = wave 최대 너비** (= 가장 많은 unit을 가진 wave의 unit 수). 그 wave의 unit들이 동시 병렬 실행되므로 그만큼의 구현자가 필요.
-- **병렬 실행 = wave 단위 진행**: 같은 wave의 unit을 구현자들에게 분배 → 전부 완료 → 다음 wave. wave 간은 barrier(순차).
-- **구현자 ↔ unit 매핑**: 한 구현자가 여러 wave에 걸쳐 자신의 unit들을 연속 담당하거나, wave마다 재분배. `writes` 비충돌이 보장돼 worktree 격리 충돌 없음.
-
-아래 분리 기준은 **독립성 판정용이 아니라** wave 내 unit을 구현자에게 묶어 배정할 때의 **명명·그룹핑 참고**다(같은 레이어/모듈 unit을 한 구현자에게 모으면 컨텍스트 효율적):
-
-| 그룹핑 참고 | 예시 |
-|----------|------|
-| **레이어** | BE 서비스 로직 / FE 컴포넌트 |
-| **모듈** | auth 모듈 / payment 모듈 |
-| **서비스** (MSA) | user-service / order-service |
-| **도메인** | 사용자단 / 관리자단 |
-
-#### 역할 정의
-
-| 역할 | 인원 | 책임 |
-|------|------|------|
-| **리더 (메인 세션)** | 1 (고정) | 태스크 분배, 진행 모니터링, 통합 머지, verify 조율, **(M/L 규모 단위검증 적용 시) 구현자별 work unit PASS/FAIL 보고를 in-memory로 수집·추적하여 의존 후속 unit 진행 가능 여부를 판정** |
-| **구현자** | 작업 단위 수 | 담당 범위 구현 + 빌드 확인 + 태스크 완료 보고 + (해당 시) 담당 work unit별 단위검증 실행·결과 보고 |
-| **리뷰어** | 1 | 전체 코드 정성 리뷰, 구현자 간 인터페이스 일치 검증 |
-
-> 리뷰어는 **M 규모 이상에서 항상 포함**합니다.
->
-> **리더의 단위검증 추적**: design `### work units` 섹션이 있는 M/L 규모에서 리더는 각 구현자의 unit 완료 보고를 받아 검증방식·결과(PASS/FAIL)를 in-memory 테이블로 추적합니다. unit X가 FAIL이면 의존 그래프상 X에 의존하는 모든 후속 unit의 진행을 차단(해당 구현자에게 대기 지시 또는 재할당). 의존이 없는 독립 unit은 다른 구현자가 계속 진행하도록 둡니다.
-
-#### 팀 구성 보고 + 사용자 승인
+병렬 단위 = 3-B wave 분해 결과 그대로 (여기서 재분석 금지). 승인 보고는 간결하게:
 
 ```
-[에이전트팀 구성]
-규모: {M/L}, wave: {W}계층, wave 최대 너비: {N} → 구현자 {N}명
-
-  wave 진행: W0 [{unit 목록}] → W1 [{unit 목록}] → … (wave 간 barrier)
-
-  구현자 A: {그룹핑명 — 담당 unit·wave} ({파일 수}개 파일)
-    - {writes 파일 목록}
-  구현자 B: {그룹핑명 — 담당 unit·wave} ({파일 수}개 파일)
-    - {writes 파일 목록}
-  리뷰어: 전체 교차 리뷰
-
-공유 인터페이스 (reads 교집합):
-  - {구현자 A ↔ B 간 경계: 공유 reads 파일·API 시그니처·타입}
+[병렬 구현 계획]
+규모: {M/L}, wave: {W}계층, 최대 병렬도: {N}
+  wave 진행: W0 [{unit}] → W1 [{unit}] → … (wave 간 barrier)
+공유 인터페이스 (선행 writes ∩ 후속 reads): {파일·시그니처}
 ```
 
-**AskUserQuestion 호출**:
-```
-question: "에이전트팀을 구성할까요?"
-header: "팀 구성"
-options:
-  - label: "승인 — 팀 구성 (Recommended)"
-    description: "위 구성대로 팀을 spawn하고 병렬 구현을 시작합니다"
-  - label: "단일 세션 구현"
-    description: "팀 없이 리더가 직접 순차 구현합니다"
-  - label: "구성 수정"
-    description: "팀원 구성이나 범위를 조정합니다"
-multiSelect: false
-```
+**AskUserQuestion 호출**: "위 wave 구성으로 병렬 구현할까요?" — "승인 — 병렬 구현 (Recommended)" / "단일 세션 구현" / "구성 수정".
+
+> 구 역할 정의(리더/구현자/리뷰어)·리더의 in-memory 단위검증 추적·agent_team 상태 스키마는 **v5.2.3에서 폐지** — implement 워크플로의 구조적 게이트(wave 분해·dependsOn 차단 전파·reconciliation)가 대체한다.
 
 #### 구현 실행 — implement Workflow (wave 병렬 + reconciliation)
 
@@ -750,23 +645,6 @@ multiSelect: false
 > **seam 계약**: 워크플로는 구현 결과 요약만 반환. 통합 브랜치 상태·verify 전이·rework 카운터는 메인.
 > **task별 Spec compliance 리뷰**(위 `중간 검수 A`)는 L규모서 reconciliation 이후 메인이 별도 수행 가능(에이전트간 검수, 대화형 아님).
 > **저하 모드**: `implement` 워크플로 미가용(2연속 throw) 시 메인이 단일 세션으로 wave 순서대로 직접 구현(단위검증 절차 본인 수행).
-
-#### 상태 파일 확장 (에이전트팀 사용 시)
-
-```json
-{
-  "phase": "implementing",
-  "scale": "M",
-  "agent_team": {
-    "enabled": true,
-    "members": [
-      {"role": "implementer", "scope": "primis-cms", "status": "active"},
-      {"role": "implementer", "scope": "primis-frontend", "status": "active"},
-      {"role": "reviewer", "scope": "*", "status": "active"}
-    ]
-  }
-}
-```
 
 ## design 문서 갱신
 

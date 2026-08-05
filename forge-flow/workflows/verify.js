@@ -29,9 +29,12 @@ if (!A.gitDiff || !String(A.gitDiff).trim()) {
   throw new Error('verify: gitDiff 미주입 — 메인이 변경 diff를 args.gitDiff로 주입해야 함.')
 }
 const scale = A.scale || 'M'
-const SCALE_DEFAULT_STRENGTH = { S: 1, M: 1, L: 2 }
-let strength = A.strength || SCALE_DEFAULT_STRENGTH[scale] || 1
-const convergenceMax = A.convergenceMax || SCALE_DEFAULT_STRENGTH[scale] || 1
+// v5.2.3 강도 재배분: 코드 결함이 요구 결함보다 후행 비용이 큼 — M verify 1→2 (review-req는 3→2로 상쇄, 총 에이전트 유지).
+// 수렴 맵은 강도와 분리 (기존엔 같은 맵 공유 → 강도 조정이 수렴 라운드를 오염).
+const SCALE_STRENGTH = { S: 1, M: 2, L: 2 }
+const SCALE_CONVERGENCE = { S: 1, M: 1, L: 2 }
+let strength = A.strength || SCALE_STRENGTH[scale] || 1
+const convergenceMax = A.convergenceMax || SCALE_CONVERGENCE[scale] || 1
 let round = A.startRound || 0
 // 비용 floor: 저위험 trivial 변경이면 검증자 1 + refuter 1 (게이트 편향=결함유지 유지).
 const lightweight = A.lightweight === true
@@ -104,6 +107,33 @@ const REFUTE_SCHEMA = {
     reason: { type: 'string' },
   },
 }
+// v5.2.3: 복수 렌즈가 같은 결함을 중복 제기하면 refute 비용이 배가됨 → 조건부 dedup (review-req 패턴 재사용).
+const DEDUP_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['merged'],
+  properties: {
+    merged: {
+      type: 'array',
+      description: '동일 근본이슈를 1건으로 병합한 정규 findings.',
+      items: VERIFIER_SCHEMA.properties.findings.items,
+    },
+  },
+}
+function dedupPrompt(findings) {
+  return `여러 독립 검증자가 제기한 코드 findings 목록이다. **동일 근본이슈만 1건으로 병합**하라.
+
+## findings (JSON)
+${JSON.stringify(findings, null, 1)}
+
+## 규칙
+- **같은 근본이슈만 병합**: 같은 결함을 다른 표현으로 지적한 항목들을 1건으로 합쳐라.
+- **다른 이슈는 분리 유지**: 같은 file:line을 건드려도 서로 다른 결함이면 별개로 둔다.
+- **불확실하면 분리 유지** (과병합 금지 — 게이트는 결함 누락이 더 위험).
+- 병합 시 severity는 가장 높은 것(REWORK>CONCERNS) 채택, location/fix는 합산해 보존.
+- **유효성 판단 금지**: 진짜 결함인지(keep/drop)는 판단하지 마라 — 다음 단계 몫. 너는 텍스트 병합만.
+- 입력에 있던 결함 정보를 누락하지 마라.`
+}
 
 // ── 검증자 프롬프트 ───────────────────────────────────────────────
 function verifierPrompt(lens) {
@@ -171,10 +201,21 @@ while (round < convergenceMax) {
     continue
   }
 
+  // 중복 병합 (조건부 배리어): 렌즈 2+ 가 같은 결함 중복 제기 시 refute 비용/리포트 중복 절감. haiku 텍스트 병합만.
+  let canonical = findings
+  if (strength >= 2 && findings.length > 1) {
+    const reworkBefore = findings.filter(f => f.severity === 'REWORK').length
+    const d = await agent(dedupPrompt(findings), { label: 'verify:dedup', phase: 'Verify', schema: DEDUP_SCHEMA, model: MODEL.mechanical })
+    if (d && Array.isArray(d.merged) && d.merged.length > 0) canonical = d.merged
+    const reworkAfter = canonical.filter(f => f.severity === 'REWORK').length
+    if (reworkAfter < reworkBefore) log(`⚠ dedup REWORK ${reworkBefore}→${reworkAfter} 감소 — 누락 아닌 중복병합인지 확인`)
+    if (canonical.length < findings.length) log(`중복 병합 ${findings.length}→${canonical.length}건`)
+  }
+
   // 적대적 확정: finding당 회의론자 다수 refute, 과반 반박이면 false positive로 폐기
   const REFUTERS = lightweight ? 1 : (scale === 'L' ? 3 : 2)
   const confirmed = (await parallel(
-    findings.map(f => () =>
+    canonical.map(f => () =>
       parallel(
         Array.from({ length: REFUTERS }, () => () =>
           agent(refutePrompt(f), { label: `refute:${f.location}`, phase: 'Refute', schema: REFUTE_SCHEMA, model: MODEL.standard })
