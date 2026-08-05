@@ -96,6 +96,20 @@ design 문서의 영향 범위를 기반으로 기존 코드를 상세 분석합
 
 **분할 절차**: 1단계 탐색 요약(파일·호출 체인)을 근거로 AC를 위상 정렬 → 순서대로 위 기준을 만족하는 최소 묶음으로 그리디 분할. **가능한 것까지만** — 강결합이라 못 쪼개는 AC 군은 하나의 잔여 chunk로 묶는다(잔여 chunk는 기준 초과 허용, 표에 ⚠ 표시).
 
+**AC 하위 분해 (큰 AC 처리)**: 단일 AC가 chunk 기준을 초과하면(변경 파일 4+ 등) 잔여 chunk로 보내지 말고 **하위 AC로 분해**한다 — `AC-N` → `AC-N.1`, `AC-N.2` … (각각 독립 검증 가능한 조건으로). design `## 인수 조건`을 갱신: 원 AC 아래 하위 AC 목록 기재, 원 AC는 "하위 AC 전체 충족 시 충족"으로 재정의.
+- **하위 분해 시 경량 요구 재검증 (필수)**: AC 변형은 요구사항 산출물 변경이므로, `review-req.js`를 **분해분만** 대상으로 1회 재호출한다 — args: `lightweight: true`, `designDoc`: 원 AC + 하위 AC 목록 + 관련 영향범위 발췌만, `perspectives` 오버라이드:
+  `["분해 보존성: 하위 AC의 합집합이 원 AC의 의미를 완전 보존하나(누락된 조건·약화된 검증 기준 없나), 각 하위 AC가 독립적으로 검증 가능한 구체 조건인가"]`
+  REWORK면 재분해 후 재검증. PASS 후 하위 AC를 chunk 귀속 대상으로 사용. (풀 review-req 재실행 아님 — 원 AC들은 이미 검수 통과, 분해분만 검증.)
+
+**실행 순서 결정**: chunks[] 배열 순서 = 실행 순서. 규칙:
+1. **의존 제약 절대 우선** (위상 정렬 위반 불가).
+2. 동순위 자유 슬롯은 ① 사용자 지정 우선 AC가 속한 chunk → ② 연결고리를 많이 공급하는 chunk(후속 영향 큰 계약 먼저 실물화 = 리스크 조기 소진) → ③ 나머지.
+3. 승인 질문에서 사용자가 순서 조정 가능 (의존 위반 조정 요청 시 사유와 함께 거부).
+
+**진행 중 순서 변경·재분할 프로토콜**: 사용자가 순서 변경/chunk 추가·제거를 요청하면 —
+- 순서 변경: 대상 chunk의 의존이 모두 `done`인지 검사 → 충족 시 chunks[] 재배열, 미충족 시 사유 보고.
+- 범위 변경(chunk 추가·제거·경계 이동): 경계표 갱신 → **분할 품질 게이트 재검사** → AC 변형이 있으면 위 경량 요구 재검증 → 재승인. `done` chunk는 불변(이미 커밋·검증 완료), 변경은 pending에만.
+
 **연결고리(interface) 도출** — chunk 간 계약을 명시한다:
 - chunk N의 연결고리 = **선행 chunk들의 writes ∩ chunk N의 reads** (파일 단위) + 그 파일에서 소비하는 **심볼 시그니처**(함수/타입/API 계약).
 - 도출 근거는 탐색 요약의 호출 체인. 추정 불가 시 사용자에게 질문(빈 칸으로 승인 진행 금지).
@@ -132,11 +146,15 @@ multiSelect: false
 | C2 | AC-2, AC-3 | src/b.ts, src/b.test.ts | src/a.ts: `parseFoo(x: Raw): Foo` | `npm test b` PASS | [C1] |
 ```
 
-2. 상태 파일에 chunk 큐 기록:
+2. 상태 파일에 chunk 큐 기록 (배열 순서 = 실행 순서):
 ```json
 { "chunk_mode": true, "current_chunk": "C1",
-  "chunks": [ {"id": "C1", "acs": ["AC-1"], "status": "pending"} ] }
+  "chunks": [
+    { "id": "C1", "acs": ["AC-1"], "status": "pending", "commit": null },
+    { "id": "C2", "acs": ["AC-2"], "status": "pending", "commit": null }
+  ] }
 ```
+> `status`: `pending`(대기) / `in_progress`(JIT 계획~구현 중) / `rework`(chunk verify REWORK 수정 중) / `done`(verify PASS + 커밋 완료). `commit`: PASS 시 커밋 해시 — 다음 chunk verify의 diff base이자 세션 재개 시 진행 재구성 근거 (verify SKILL이 기록).
 
 **chunk 모드에서의 후속 단계 변경** (아래 각 단계 본문보다 우선):
 - **3-0 plan-judge: 스킵** — chunk = S 등가, 해법 공간 좁음.

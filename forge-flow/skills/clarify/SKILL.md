@@ -141,6 +141,7 @@ multiSelect: false
 ```
 
 - "이어서 진행" → design 파일을 읽고 해당 phase의 다음 단계를 안내합니다:
+  - **chunk 모드** (상태 파일 `chunk_mode: true`) → 진행 보드를 먼저 표시(`✅ done ▶ current ⏳ pending`, `chunks[].commit` 해시로 검증) 후 `current_chunk`의 상태에 맞게 재개: `in_progress`면 해당 chunk JIT 계획/구현부터, `rework`면 chunk 수정→`/forge-flow:verify` 재호출부터
   - implementing → "구현을 이어서 진행하세요. 완료 후 `/forge-flow:verify`"
   - verified/tested → "`/forge-flow:complete`로 마무리하세요"
   - 기타 → 해당 phase에 맞는 스킬 호출 안내

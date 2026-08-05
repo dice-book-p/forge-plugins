@@ -132,6 +132,28 @@ if [ -n "$BOUND_STATE" ]; then
     WORK_DIR_CTX=" [WORKTREE] 작업 디렉토리: ${WORK_DIR}. 파일 읽기/수정은 ${WORK_DIR}/ 경로 사용. git 명령: git -C ${WORK_DIR}."
   fi
 
+  # chunk 진행 컨텍스트 (chunk_mode 작업이면 진행 n/m + 현재 chunk 표시)
+  CHUNK_MODE=$(_json_read '.chunk_mode' "$BOUND_STATE")
+  if [ "$CHUNK_MODE" = "true" ] || [ "$CHUNK_MODE" = "True" ]; then
+    CUR_CHUNK=$(_json_read '.current_chunk' "$BOUND_STATE")
+    if command -v jq >/dev/null 2>&1; then
+      CHUNK_TOTAL=$(jq -r '.chunks | length' "$BOUND_STATE" 2>/dev/null)
+      CHUNK_DONE=$(jq -r '[.chunks[] | select(.status == "done")] | length' "$BOUND_STATE" 2>/dev/null)
+    else
+      read -r CHUNK_DONE CHUNK_TOTAL <<EOF
+$(python3 -c "
+import json
+d=json.load(open('$BOUND_STATE'))
+c=d.get('chunks',[])
+print(sum(1 for x in c if x.get('status')=='done'), len(c))
+" 2>/dev/null)
+EOF
+    fi
+    if [ -n "$CHUNK_TOTAL" ] && [ "$CHUNK_TOTAL" != "0" ] && [ "$CHUNK_TOTAL" != "null" ]; then
+      WORK_DIR_CTX="${WORK_DIR_CTX} [CHUNK] 분할 진행 ${CHUNK_DONE:-0}/${CHUNK_TOTAL} 완료, 현재 ${CUR_CHUNK:-?}. chunk diff base는 state chunks[].commit 참조."
+    fi
+  fi
+
   # phase 전이 관측·검증 (flow.json = 허용 전이 단일 진실원) — 위반은 경고만(비차단).
   # 훅이 프롬프트마다 관측한 phase를 sidecar에 기록, 직전 관측과 달라졌으면 flow.json 에지와 대조.
   # cross-turn drift(수동편집·크래시·세션재개로 phase가 그래프 밖 경로로 점프)를 다음 프롬프트에서 조기 노출.

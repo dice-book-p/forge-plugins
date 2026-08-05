@@ -1,5 +1,12 @@
 # forge-flow Changelog
 
+## v5.2.2 — chunk 순서·우선순위 + 추적 강화 + AC 하위 분해 요구 재검증
+
+- **feat (ordering)**: chunk **실행 순서 규칙** 명문화 — 의존(위상 정렬) 절대 우선, 자유 슬롯은 사용자 지정 우선 AC → 연결고리 공급 많은 chunk(리스크 조기 소진) → 나머지. chunks[] 배열 순서 = 실행 순서. **진행 중 순서 변경·재분할 프로토콜**: 순서 변경은 의존 done 검사 후 재배열, 범위 변경은 품질 게이트 재검사 + (AC 변형 시) 경량 요구 재검증 + 재승인. done chunk 불변.
+- **feat (tracking)**: chunk 추적 강화 — ① status 세분화 `pending/in_progress/rework/done` + PASS 시 `chunks[].commit` 해시 기록(다음 chunk diff base의 진실원 — 세션 재개에도 정확). ② chunk PASS마다 진행 보드 출력(`✅C1 ✅C2 ▶C3 ⏳C4`). ③ workflow-state.sh가 chunk_mode 작업에 `[CHUNK] 분할 진행 n/m, 현재 Cx` 컨텍스트를 매 프롬프트 주입. ④ clarify "이어서 진행"이 chunk-aware 재개(보드 표시 + current_chunk status별 재개 지점).
+- **feat (req-verification)**: **AC 하위 분해 + 경량 요구 재검증** — 단일 AC가 chunk 기준 초과 시 잔여 chunk로 보내지 않고 하위 AC(AC-N.1…)로 분해, design 인수조건 갱신. AC 변형은 요구 산출물 변경이므로 `review-req.js`를 lightweight + perspectives 오버라이드("분해 보존성: 하위 AC 합집합 = 원 AC 의미, 각각 독립 검증 가능")로 분해분만 1회 재검증. 이로써 chunk 단위 요구검증 경로 확보(풀 재검수 불필요 — 기존 워크플로 재사용).
+- **affected**: `skills/plan/SKILL.md`, `skills/verify/SKILL.md`, `skills/clarify/SKILL.md`, `hooks/workflow-state.sh`
+
 ## v5.2.1 — chunk 연결고리 계약 + 전이 그래프(flow.json) + 게이트 감사
 
 그래프 엔지니어링 2요소 적용: 제어흐름 명시화(G1) + 비용 게이트 counter-metric(G2). 더불어 chunk 분할 품질 우려(경계·chunk 간 연결) 보강.

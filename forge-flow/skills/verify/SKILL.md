@@ -136,11 +136,15 @@ design `## 검수 결과`에 `- verify: PASS (날짜)`, 상세는 `{task_id}.rev
 2. 빌드 검증(§4) 동일.
 3. Workflow 호출(§5) — **args 스코핑이 핵심**:
    - `designExcerpt`: **현재 chunk의 AC + 경계표 행(검증 기준·연결고리) + `### chunk 계획: {id}` 섹션만**. 전체 design 주입 금지. **연결고리 계약을 반드시 포함** — ① 이 chunk가 소비하는 선행 인터페이스(시그니처대로 사용했나), ② 이 chunk가 후속에 내보내는 인터페이스(경계표 계약대로 export했나)를 검증자가 대조하도록.
-   - `gitDiff`: **직전 chunk 완료 커밋 이후의 diff만** (`git diff {직전 chunk 커밋}..HEAD` + 미커밋 변경. 첫 chunk는 기능 브랜치 분기점 기준).
+   - `gitDiff`: **직전 chunk 완료 커밋 이후의 diff만** — base는 **상태 파일 `chunks[]`에서 직전 `done` chunk의 `commit` 해시**를 읽어 사용 (`git diff {해시}..HEAD` + 미커밋 변경. 첫 chunk는 기능 브랜치 분기점 기준). 세션이 바뀌어도 state가 diff 경계의 진실원.
    - `lightweight`: chunk 기준으로 4-A0 판정 (S-등가라 대부분 true), `strength: 1`, `convergenceMax: 1`, `startRound: 0`.
 4. verdict 라우팅:
-   - **PASS** → **chunk 완료 자동 커밋**: 해당 chunk의 writes만 `git add` 후 `git commit -m "{task_id} {chunk_id}: {chunk 한 줄 요약}"` (`.forge-flow/` 하위 제외 — complete와 동일 규칙). 상태 파일 갱신: `chunks[].status="done"`, `current_chunk`=다음 pending chunk, `rework_counts.verify`=0. design `## 검수 결과`에 `- verify({chunk_id}): PASS (날짜)` 기록. → **다음 chunk의 JIT 계획 작성으로** (plan SKILL 2.5단계). 남은 chunk 없으면 → B. 통합 verify.
-   - **REWORK** → §7 동일 (카운터도 동일: `rework_lifetime.verify`는 chunk 간 누적이므로 에스컬레이션이 자동 동작). 수정 범위는 chunk diff 내부로 한정.
+   - **PASS** → **chunk 완료 자동 커밋**: 해당 chunk의 writes만 `git add` 후 `git commit -m "{task_id} {chunk_id}: {chunk 한 줄 요약}"` (`.forge-flow/` 하위 제외 — complete와 동일 규칙). 상태 파일 갱신: `chunks[].status="done"` + **`chunks[].commit`=커밋 해시**, `current_chunk`=다음 pending chunk(status→`in_progress`), `rework_counts.verify`=0. design `## 검수 결과`에 `- verify({chunk_id}): PASS (날짜)` 기록. **진행 보드 출력**:
+     ```
+     [chunk 진행] ✅C1 ✅C2 ▶C3 ⏳C4 ⏳C5  (2/5 완료, 현재 C3)
+     ```
+     → **다음 chunk의 JIT 계획 작성으로** (plan SKILL 2.5단계). 남은 chunk 없으면 → B. 통합 verify.
+   - **REWORK** → §7 동일 (카운터도 동일: `rework_lifetime.verify`는 chunk 간 누적이므로 에스컬레이션이 자동 동작). `chunks[].status="rework"` 기록, 수정 범위는 chunk diff 내부로 한정. 재검수 PASS 시 status 경로는 위와 동일.
    - **CONCERNS** → §6 동일.
 
 ### B. 통합 verify (전 chunk 완료 후 1회)
