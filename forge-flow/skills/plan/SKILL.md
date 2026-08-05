@@ -161,7 +161,7 @@ multiSelect: false
 - **3단계 상세 계획: chunk별 JIT** — 착수하는 chunk에 대해서만 design에 `### chunk 계획: {id}` 하위 섹션(따를 패턴·변경 순서·검증 방법, 10줄 내외)을 작성. 전체 상세 계획을 미리 만들지 않는다.
   - **연결고리 실측 원칙 (필수)**: 선행 chunk가 있으면 JIT 계획 작성 전 **커밋된 실제 코드에서 연결고리 인터페이스를 직접 읽어**(Read/Grep) 시그니처를 확인하고 계획에 인용한다. 경계표의 계약과 실제 코드가 다르면(선행 chunk가 계약과 다르게 구현) → 즉시 보고: 경계표 갱신 + 영향 후속 chunk 재검토. **경계표 기억이나 추측으로 계획 금지** — 순차 chunk의 장점은 선행 산출물이 실물이라는 것.
 - **3-B work unit 분해: 스킵** — chunk 경계표의 writes/검증 기준이 unit 역할을 대체. implement.js fan-out 불사용, chunk는 메인 단일 세션 구현이 기본.
-- **review-plan: 경계표에 대해 1회만** (L 필수·M 조건 판정은 기존과 동일). chunk별 JIT 계획은 S 취급으로 검수 생략. 호출 시 args에 **분할 검증 관점을 오버라이드**한다 (review-plan SKILL §4의 chunk 모드 관점 참조 — 경계 적절성·연결고리 완전성·검증 기준 독립성).
+- **review-plan: 경계표에 대해 1회만** — **호출 시점 = plan 완료 직후·첫 chunk 착수 전** (L 필수·M 조건 판정은 기존과 동일). chunk별 JIT 계획·통합 verify 후에는 호출하지 않음. chunk별 JIT 계획은 S 취급으로 검수 생략. 호출 시 args에 **분할 검증 관점을 오버라이드**한다 (review-plan SKILL §4의 chunk 모드 관점 참조 — 경계 적절성·연결고리 완전성·검증 기준 독립성).
 - **4단계 검증 설정: 축소** — chunk verify는 강도 1·수렴 1 고정(4-A/4-B 질문 생략). 통합 verify 강도는 규모 기본(M=1/L=2) 자동. 질문은 테스트 방식(4-C) + TDD(4-D)만 남으며 1회 AskUserQuestion에 묶는다.
 - **구현·검수 루프**: verify SKILL의 `## chunk 모드` 절차를 따른다 — chunk JIT 계획 → 구현 → chunk diff만 verify(lightweight) → PASS 시 자동 커밋 + 다음 chunk → 전 chunk 완료 시 통합 verify(전체 diff) → test 1회 → complete.
 

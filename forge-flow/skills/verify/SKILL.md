@@ -143,7 +143,8 @@ design `## 검수 결과`에 `- verify: PASS (날짜)`, 상세는 `{task_id}.rev
      ```
      [chunk 진행] ✅C1 ✅C2 ▶C3 ⏳C4 ⏳C5  (2/5 완료, 현재 C3)
      ```
-     → **다음 chunk의 JIT 계획 작성으로** (plan SKILL 2.5단계). 남은 chunk 없으면 → B. 통합 verify.
+     → **phase를 `implementing`으로 전이**하고 **다음 chunk의 JIT 계획 작성으로** (plan SKILL 2.5단계). JIT 계획은 구현 준비 행위 — `planning` 재진입 아님 (chunk 루프는 `implementing↔verifying` 안에서만 돎, flow.json 에지 그대로). 남은 chunk 없으면 phase `verifying` 유지 → B. 통합 verify.
+     > **convergence_round 불오염**: chunk verify는 항상 `startRound: 0`·`convergenceMax: 1` 일회성 — 상태 파일 `convergence_round`에 **기록하지 않는다**. 이 필드는 B. 통합 verify 전용.
    - **REWORK** → §7 동일 (카운터도 동일: `rework_lifetime.verify`는 chunk 간 누적이므로 에스컬레이션이 자동 동작). `chunks[].status="rework"` 기록, 수정 범위는 chunk diff 내부로 한정. 재검수 PASS 시 status 경로는 위와 동일.
    - **CONCERNS** → §6 동일.
 
@@ -152,7 +153,7 @@ design `## 검수 결과`에 `- verify: PASS (날짜)`, 상세는 `{task_id}.rev
 chunk verify는 chunk 내부만 봤으므로, 통합 verify는 **chunk 경계 간 결함**(패턴 불일치·헬퍼/타입 중복 정의·시그니처 어긋남·AC 간 상호작용)을 잡는 최종 게이트다.
 
 - `designExcerpt`: 전체 design 발췌 (§5 기존과 동일), `gitDiff`: `git diff {base_branch 또는 분기점}...HEAD` 전체.
-- `strength`: 규모 기본 (M=1 / L=2), `convergenceMax`: 규모 기본, `lightweight: false`, `startRound`: 상태 파일 유지값.
+- `strength`: 규모 기본 (M=1 / L=2), `convergenceMax`: 규모 기본, `lightweight: false`, `startRound`: **최초 진입 시 0** (chunk verify는 convergence_round를 건드리지 않으므로 초기값 그대로) / 통합 verify REWORK 재진입 시에만 상태 파일 유지값.
 - verdict 라우팅·PASS 후 상태 기록·test 진행은 §6/§8 기존과 동일. REWORK 시 findings의 chunk 귀속을 판단해 해당 chunk 범위로 수정.
 
 ## Rework Log 관리

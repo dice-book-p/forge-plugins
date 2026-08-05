@@ -143,7 +143,7 @@ if [ -n "$BOUND_STATE" ]; then
       read -r CHUNK_DONE CHUNK_TOTAL <<EOF
 $(python3 -c "
 import json
-d=json.load(open('$BOUND_STATE'))
+d=json.load(open(\"$BOUND_STATE\"))
 c=d.get('chunks',[])
 print(sum(1 for x in c if x.get('status')=='done'), len(c))
 " 2>/dev/null)
