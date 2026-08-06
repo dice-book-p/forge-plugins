@@ -1,5 +1,12 @@
 # forge-flow Changelog
 
+## v5.3.1 — refute 판정 기준 미주입 수정 (chunk 모드 e2e 실증에서 발견)
+
+- **fix (critical)**: **refutePrompt에 design 문서·프로젝트 컨텍스트 미주입** — review-req/review-plan/verify 3개 워크플로 공통. refuter가 판정 기준 문서 없이 cwd를 크롤하다 **타프로젝트 design을 읽고 판정**할 수 있었음. 실증에서 재현: 픽스처 검증 중 refuter 4명 전원이 세션 cwd의 다른 프로젝트 design을 근거로 타당한 findings를 오반박 → **거짓 PASS**. 수정 후 동일 입력 재실행 시 refuter가 올바른 원문을 인용하며 3건 확정 → 정상 REWORK.
+  - 수정: 3개 워크플로의 refutePrompt에 `projectContext` + `designDoc`/`designExcerpt` 인라인 + "아래 원문만 사용, 다른 파일에서 design을 찾지 마라" 지시.
+- **test (e2e)**: **chunk 모드 풀사이클 headless 실증** (픽스처 cfg-parse, M 규모 2-chunk): 부트스트랩→clarify(가정 명시)→review-req(REWORK→정책 확정→CONCERNS 수용→PASS)→plan(scout 1명·분할 품질 게이트 4종·경계표)→review-plan(chunk 관점 3종 PASS)→C1 구현·chunk verify PASS·자동 커밋→C2 연결고리 실측·구현·chunk verify PASS→통합 verify(강도 2) PASS→게이트 감사(누출 0)→completed. 전 게이트 headless 자동 결정 7건 기록·보고. chunk verify 실측 비용: **1에이전트/28k/10초** (경량성 입증).
+- **affected**: `workflows/review-req.js`, `workflows/review-plan.js`, `workflows/verify.js`
+
 ## v5.3.0 — headless/CLI 상호작용 모드 (대화형 게이트의 무인 환경 대응)
 
 `claude -p`·CI·봇(Discord 등) 등 AskUserQuestion이 불가능한 환경에서도 워크플로 전 단계가 진행 가능하도록 상호작용 계층 도입.

@@ -167,7 +167,13 @@ function refutePrompt(f) {
 문제: [${f.severity}] ${f.problem}
 위치: ${f.location} | AC: ${f.ac} | 제안수정: ${f.fix}
 
-저장소를 직접 확인하여 판단하라:
+## 프로젝트 컨텍스트
+${A.projectContext || '(없음)'}
+
+## design 발췌 (판정 기준 — 아래 원문만 사용, 다른 파일에서 design을 찾지 마라)
+${A.designExcerpt || '(없음)'}
+
+위 기준과 저장소(프로젝트 컨텍스트의 저장소 루트 안만)를 직접 확인하여 판단하라:
 - 코드 증거가 지적과 일치하나? 위치가 실재하나?
 - design AC/패턴 기준으로 진짜 위반인가, 검증자 오판인가?
 **이것은 검증 게이트다 — 결함 누락이 오탐보다 위험.** 불확실하면 refuted=false (결함 유지).

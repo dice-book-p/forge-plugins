@@ -176,7 +176,13 @@ function refutePrompt(f) {
 문제: [${f.severity}] ${f.problem}
 위치: ${f.location} | AC: ${f.ac} | 제안수정: ${f.fix}
 
-design 문서를 직접 확인하여 판단하라:
+## 프로젝트 컨텍스트
+${A.projectContext || '(없음)'}
+
+## design 문서 (판정 기준 — 아래 원문만 사용, 다른 파일에서 design을 찾지 마라)
+${A.designDoc}
+
+위 design 원문을 기준으로 판단하라:
 - design 원문이 지적과 일치하나? 해당 AC/섹션이 실재하나?
 - 진짜 요구 결함(모호·누락·모순)인가, 검증자 오판인가?
 **이것은 요구 게이트다 — 결함 누락이 오탐보다 위험.** 불확실하면 refuted=false (결함 유지).

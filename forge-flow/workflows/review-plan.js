@@ -173,7 +173,13 @@ function refutePrompt(f) {
 문제: [${f.severity}] ${f.problem}
 위치: ${f.location} | AC: ${f.ac} | 제안수정: ${f.fix}
 
-design 계획과 저장소를 직접 확인하여 판단하라:
+## 프로젝트 컨텍스트
+${A.projectContext || '(없음)'}
+
+## design 문서 (판정 기준 — 아래 원문만 사용, 다른 파일에서 design을 찾지 마라)
+${A.designDoc}
+
+위 design 원문과 저장소 코드(프로젝트 컨텍스트의 저장소 루트 안만)를 확인하여 판단하라:
 - 계획 원문·코드가 지적과 일치하나? 지적한 파일/항목이 실재하나?
 - 진짜 계획 결함(AC 미커버·전파누락·순서역전·범위침범)인가, 평가자 오판인가?
 **이것은 계획 게이트다 — 결함 누락이 오탐보다 위험.** 불확실하면 refuted=false (결함 유지).
@@ -185,7 +191,7 @@ log(`review-plan 시작 — 규모 ${scale}, 관점 ${strength}개${lightweight 
 
 const perspectives = perspectivesFor(strength)
 const raw = await parallel([
-  ...perspectives.map((p, i) => () =>
+  ...perspectives.map((p) => () =>
     agent(verifierPrompt(p), {
       label: `plan:${p.slice(0, 8)}`,
       phase: 'Judge',
